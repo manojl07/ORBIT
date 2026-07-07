@@ -7,16 +7,16 @@ const userSchema = new mongoose.Schema({
     required: [true, 'Username is required'],
     unique: true,
     trim: true,
+    lowercase: true,
     minLength: 3,
     maxLength: 30,
     index: true,
-    lowercase: true
   },
 
   email: {
     type: String,
-    unique: true,
     required: [true, 'Email is required'],
+    unique: true,
     trim: true,
     lowercase: true,
     index: true,
@@ -55,6 +55,13 @@ const userSchema = new mongoose.Schema({
     ref: "User",
   }],
 
+  refreshTokens: [
+    {
+      token: { type: String, required: true },
+      createdAt: {type: Date, default: Date.now}
+    }
+  ],
+
   isVerified: {
     type: Boolean,
     default: false,
@@ -62,10 +69,12 @@ const userSchema = new mongoose.Schema({
   
 }, { timestamps: true })
 
-userSchema.pre('save', async function () {
-  if(!this.isModified("password")) return;
+userSchema.pre('save', async function (next) {
+  if(!this.isModified("password")) return next();
 
   this.password = await bcrypt.hash(this.password, 12);
+
+  next()
 })
 
 userSchema.methods.comparePassword = async function (password) {
