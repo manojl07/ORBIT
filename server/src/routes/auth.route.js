@@ -5,9 +5,15 @@ const { registerController, loginController } = require('../controllers/auth.con
 const validate = require('../middlewares/validate.middleware')
 const { registerSchema, loginSchema } = require('../validators/auth.validator')
 
+const upload = require('../middlewares/upload.middleware')
 
+router.post('/register',
+  upload.single("profileImg"),
+  validate(registerSchema),
+  registerController)
 
-router.post('/register', validate(registerSchema), registerController)
-router.post('/login', validate(loginSchema), loginController)
+router.post('/login',
+  validate(loginSchema),
+  loginController)
 
 module.exports = router;

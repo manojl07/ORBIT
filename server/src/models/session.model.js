@@ -39,12 +39,6 @@ const sessionSchema = new mongoose.Schema({
     required: true,
     index: true,
   }
-}, {
-  expiresAt: {
-    type: Date,
-    required: true,
-    index: true,
-  }
 }, {timestamps: true})
 
 module.exports = mongoose.model("Session", sessionSchema)

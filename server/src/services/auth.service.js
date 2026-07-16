@@ -5,6 +5,21 @@ const Session = require('../models/session.model')
 const ApiError = require('../utils/ApiError')
 const { createTokens } = require('./token.service')
 
+const { uploadImage } = require('../services/image.service')
+
+const { verifyRefreshToken } = require("../utils/jwt")
+
+const sanitizeUser = (user) => ({
+  id: user._id,
+  username: user.username,
+  email: user.email,
+  bio: user.bio,
+  profileImg: user.profileImg,
+  followersCount: user.followers.length,
+  followingCount: user.following.length,
+  isVerified: user.isVerified,
+  createdAt: user.createdAt
+})
 
 const hashToken = (token) => {
   return crypto.createHash("sha256").update(token).digest("hex");
@@ -35,7 +50,7 @@ const createSession = async ({ user, refreshToken, deviceId, userAgent, ipAddres
   return session;
 }
 
-const register = async ({ username, email, password, bio, deviceId, userAgent, ipAddress }) => {
+const register = async ({ username, email, password, bio, deviceId, userAgent, ipAddress, profileImg }) => {
 
   const existing = await User.findOne({ $or: [{ email }, { username }] })
 
@@ -43,14 +58,29 @@ const register = async ({ username, email, password, bio, deviceId, userAgent, i
     throw new ApiError(409, "User already exists")
   }
 
-  const user = await User.create({ username, email, password, bio })
+  const uploadedImage = profileImg
+    ? await uploadImage(profileImg)
+    : null;
+
+  const userData = { username, email, password, bio }
+
+  if (uploadedImage) {
+    userData.profileImg = uploadImage.imageUrl;
+  }
+
+
+  const user = await User.create(userData);
 
   const { accessToken, refreshToken } = createTokens(user);
 
   const session = await createSession({ user, refreshToken, deviceId, userAgent, ipAddress })
 
   return {
-    user, accessToken, refreshToken, sessionId: session._id
+    user: sanitizeUser(user),
+    accessToken,
+    refreshToken,
+    sessionId: session._id,
+    deviceId
   }
 }
 
@@ -68,7 +98,46 @@ const login = async ({ identifier, password, deviceId, userAgent, ipAddress }) =
 
   const session = await createSession({ user, refreshToken, deviceId, userAgent, ipAddress })
 
-  return { user, accessToken, refreshToken, sessionId: session._id }
+  return {
+    user: sanitizeUser(user),
+    accessToken,
+    refreshToken,
+    sessionId: session._id,
+    deviceId
+  }
+}
+
+const refresh = async ({ refreshToken, deviceId, userAgent, ipAddress }) => {
+
+  const decoded = verifyRefreshToken(refreshToken);
+
+  const tokenHash = hashToken(refreshToken);
+
+  const session = await Session.findOne({ tokenHash })
+
+  if (!session) {
+    throw new ApiError(401, "Invalid refresh token");
+  }
+
+  const user = await User.findById(decoded.id)
+
+  if (!user) {
+    throw new ApiError(404, "User not found");
+  }
+
+  const { accessToken, refreshToken: newRefreshToken } = createTokens(user);
+
+  await Session.findByIdAndDelete(session._id);
+
+  const newSession = await createSession({
+    user,
+    refreshToken: newRefreshToken,
+    deviceId,
+    userAgent,
+    ipAddress,
+  })
+
+  return { accessToken, refreshToken: newRefreshToken, sessionId: newSession._id }
 }
 
 const logout = async (sessionId) => {
@@ -85,7 +154,7 @@ const logoutAll = async (userId) => {
 
 
 
-module.exports = { register, login, logout, logoutAll };
+module.exports = { register, login, refresh, logout, logoutAll };
 
 
 // right now ill copy paste all the code written for this project reading all files give the explation of all the files and their code in the flow how the data is flowing and these how they are woking from app.js, server.js to every controller, route, middleware, utils, validators, service, config, consonants etc,.
