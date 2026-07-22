@@ -24,4 +24,6 @@ const refreshSchema = z.object({
   refreshToken: z.string(),
 })
 
-module.exports = { registerSchema, loginSchema, refreshSchema }
+const logoutSchema = z.object({sessionId: z.string()})
+
+module.exports = { registerSchema, loginSchema, refreshSchema, logoutSchema }

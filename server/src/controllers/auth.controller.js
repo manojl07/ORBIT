@@ -16,7 +16,7 @@ const registerController = asyncHandler(async (req, res) => {
 
   res.cookie("accessToken", result.accessToken, accessCookieOptions)
 
-  res.cookie("refreshToken", result.refreshToken.refreshCookieOption)
+  res.cookie("refreshToken", result.refreshToken, refreshCookieOptions)
 
   res.cookie("deviceId", result.deviceId,
     {
@@ -58,6 +58,12 @@ const loginController = asyncHandler(async (req, res) => {
   ))
 })
 
+const getMeController = asyncHandler(async (req, res) => {
+  const user = await authService.getMe(req.user.id);
+
+  return res.status(200).json(new ApiResponse(200, "User fetched successfully", user))
+})
+
 const refreshController = asyncHandler(async (req, res) => {
   const result = await authService.refresh({
     refreshToken: req.cookies.refreshToken,
@@ -69,4 +75,20 @@ const refreshController = asyncHandler(async (req, res) => {
   return res.status(200).json(new ApiResponse(200, "Token refreshed", result))
 })
 
-module.exports = { registerController, loginController, refreshController }
+const logoutController = asyncHandler(async (req, res) => {
+  await authService.logout(req.cookies.refreshToken)
+
+  res.clearCookie("accessToken")
+  res.clearCookie("refreshToken")
+  res.clearCookie("deviceId")
+
+  return res.status(200).json(new ApiResponse(200, "Logged out successfully"))
+})
+
+const logoutAllController = asyncHandler(async (req, res) => {
+  await authService.logoutAll(req.user.id)
+
+  return res.status(200).json(new ApiResponse(200, "Logged out from all devices"));
+})
+
+module.exports = { registerController, loginController, getMeController, refreshController, logoutController, logoutAllController }

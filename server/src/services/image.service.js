@@ -10,7 +10,10 @@ const uploadImage = async(file) => {
     folder: '/orbit/profile-images'
   })
 
-  return response.url;
+  return {
+    imageUrl: response.url,
+    fileId: response.fileId,
+  }
 }
 
 module.exports = {uploadImage}

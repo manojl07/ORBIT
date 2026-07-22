@@ -66,6 +66,7 @@ const register = async ({ username, email, password, bio, deviceId, userAgent, i
 
   if (uploadedImage) {
     userData.profileImg = uploadedImage.imageUrl;
+    userData.profileImgFileId = uploadedImage.fileId;
   }
 
 
@@ -107,6 +108,16 @@ const login = async ({ identifier, password, deviceId, userAgent, ipAddress }) =
   }
 }
 
+const getMe = async(userId) => {
+  const user = await User.findById(userId);
+
+  if(!user){
+    throw new ApiError(404, "User not found")
+  }
+
+  return sanitizeUser(user);
+}
+
 const refresh = async ({ refreshToken, deviceId, userAgent, ipAddress }) => {
 
   const decoded = verifyRefreshToken(refreshToken);
@@ -140,21 +151,27 @@ const refresh = async ({ refreshToken, deviceId, userAgent, ipAddress }) => {
   return { accessToken, refreshToken: newRefreshToken, sessionId: newSession._id }
 }
 
-const logout = async (sessionId) => {
-  await Session.findByIdAndDelete(sessionId)
+const logout = async (refreshToken) => {
+  const tokenHash = hashToken(refreshToken);
+
+  await Session.findOneAndDelete({
+    tokenHash,
+  });
 
   return true;
-}
+};
 
 const logoutAll = async (userId) => {
-  await Session.deleteMany({ user: userId })
+  await Session.deleteMany({
+    user: userId,
+  });
 
   return true;
-}
+};
 
 
 
-module.exports = { register, login, refresh, logout, logoutAll };
+module.exports = { register, login, getMe, refresh, logout, logoutAll };
 
 
 // right now ill copy paste all the code written for this project reading all files give the explation of all the files and their code in the flow how the data is flowing and these how they are woking from app.js, server.js to every controller, route, middleware, utils, validators, service, config, consonants etc,.
