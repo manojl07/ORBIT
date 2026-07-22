@@ -2,6 +2,7 @@ const asyncHandler = require('../utils/asyncHandler')
 const authService = require('../services/auth.service')
 const ApiResponse = require('../utils/ApiResponse')
 const crypto = require("crypto");
+const { accessCookieOptions, refreshCookieOptions } = require('../config/cookie.config');
 
 
 const registerController = asyncHandler(async (req, res) => {
@@ -13,8 +14,10 @@ const registerController = asyncHandler(async (req, res) => {
     ipAddress: req.ip,
   })
 
-  res.cookie("accessToken", accessToken)
-  res.cookie("refreshToken", refreshToken)
+  res.cookie("accessToken", result.accessToken, accessCookieOptions)
+
+  res.cookie("refreshToken", result.refreshToken.refreshCookieOption)
+
   res.cookie("deviceId", result.deviceId,
     {
       httpOnly: true,
@@ -36,9 +39,34 @@ const loginController = asyncHandler(async (req, res) => {
     ipAddress: req.ip
   });
 
-  return res.status(200).json(new ApiResponse(200, "Login successful", result))
+  res.cookie("accessToken", result.accessToken, accessCookieOptions)
+
+  res.cookie("refreshToken", result.refreshToken, refreshCookieOptions)
+
+  res.cookie("deviceId", result.deviceId, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "strict",
+    maxAge: 7 * 24 * 60 * 60 * 1000
+  })
+
+  return res.status(200).json(new ApiResponse(200, "Login successful",
+    {
+      user: result.user,
+      sessionId: result.sessionId,
+    }
+  ))
 })
 
-const refreshController = 
+const refreshController = asyncHandler(async (req, res) => {
+  const result = await authService.refresh({
+    refreshToken: req.cookies.refreshToken,
+    deviceId: req.cookies.deviceId,
+    userAgent: req.get("user-agent"),
+    ipAddress: req.ip,
+  })
 
-module.exports = { registerController, loginController }
+  return res.status(200).json(new ApiResponse(200, "Token refreshed", result))
+})
+
+module.exports = { registerController, loginController, refreshController }

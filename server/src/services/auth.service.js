@@ -65,7 +65,7 @@ const register = async ({ username, email, password, bio, deviceId, userAgent, i
   const userData = { username, email, password, bio }
 
   if (uploadedImage) {
-    userData.profileImg = uploadImage.imageUrl;
+    userData.profileImg = uploadedImage.imageUrl;
   }
 
 
