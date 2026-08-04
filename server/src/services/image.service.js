@@ -16,4 +16,10 @@ const uploadImage = async(file, folder = "/orbit") => {
   }
 }
 
-module.exports = {uploadImage}
+const deleteImage = async(fileId) => {
+  await imagekit.deleteFile(fileId);
+
+  return true;
+}
+
+module.exports = {uploadImage, deleteImage}

@@ -7,7 +7,7 @@ const validate = require('../middlewares/validate.middleware')
 
 const { createPostSchema } = require('../validators/post.validator')
 
-const { createPostController } = require("../controllers/post.controller")
+const { createPostController, deletePostController } = require("../controllers/post.controller")
 
 router.post('/',
   authMiddleware,
@@ -15,5 +15,7 @@ router.post('/',
   validate(createPostSchema),
   createPostController
 )
+
+router.delete('/:id', authMiddleware, deletePostController);
 
 module.exports = router;
