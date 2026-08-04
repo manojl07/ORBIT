@@ -9,6 +9,8 @@ const { uploadImage } = require('../services/image.service')
 
 const { verifyRefreshToken } = require("../utils/jwt")
 
+const Post = require('../models/post.model')
+
 const sanitizeUser = (user) => ({
   id: user._id,
   username: user.username,
@@ -115,7 +117,9 @@ const getMe = async (userId) => {
     throw new ApiError(404, "User not found")
   }
 
-  return sanitizeUser(user);
+  const postsCount = await Post.countDocuments({ user: userId })
+
+  return { ...sanitizeUser(user), postsCount };
 }
 
 const refresh = async ({ refreshToken, deviceId, userAgent, ipAddress }) => {

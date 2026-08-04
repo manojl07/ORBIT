@@ -30,4 +30,13 @@ const getUserPostsController = asyncHandler(async (req, res) => {
   return res.status(200).json(new ApiResponse(200, "Posts fetched successfully", result))
 })
 
-module.exports = { createPostController, deletePostController, getUserPostsController }
+const getFeedController = asynHandler(async (req, res) => {
+  const result = await postService.getFeed({
+    page: Number(req.query.page) || 1,
+    limit: Number(req.query.limit) || 10
+  })
+
+  return res.status(200).json(new ApiResponse(200, "Feed fetched successfully", result))
+})
+
+module.exports = { createPostController, deletePostController, getUserPostsController, getFeedController }

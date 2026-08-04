@@ -3,6 +3,17 @@ const ApiError = require("../utils/ApiError")
 
 const { uploadImage, deleteImage } = require("./image.service")
 
+const sanitizePost = (post) => ({
+  id: post._id,
+  caption: post.caption,
+  imageUrl: post.imageUrl,
+  likesCount: post.likesCount,
+  commentsCount: post.commentsCount,
+  isEdited: post.isEdited,
+  user: post.user,
+  createdAt: post.createdAt,
+});
+
 
 const createPost = async ({ caption, image, userId }) => {
   if (!image) {
@@ -46,7 +57,6 @@ const getUserPosts = async ({ userId, page = 1, limit = 12 }) => {
 
   const [posts, total] = await Promise.all([
      Post.find({ user: userId })
-     .select("-__v -imageFileId")
      .sort({ createAt: -1 })
      .skip(skip)
      .limit(limit),
@@ -55,11 +65,35 @@ const getUserPosts = async ({ userId, page = 1, limit = 12 }) => {
   ])
 
   return {
-    posts,
+    posts: posts.map(sanitizePost),
     pagination: {
       page, limit, total, totalPages: Math.ceil(total/limit)
     }
   }
 }
 
-module.exports = { createPost, deletePost, getUserPosts }
+const getFeed = async({page=1, limit=10}) => {
+  const skip = (page - 1) * limit;
+
+  const [posts, total] = await Promise.all([
+    Post.find()
+    .populate("user", "username profileImg")
+    .sort({createdAt: -1})
+    .skip(skip)
+    .limit(limit),
+
+    Post.countDocuments()
+  ])
+
+  return {
+    posts,
+    pagination: {
+      page,
+      limit,
+      total,
+      totalPages: Math.ceil(total/limit)
+    }
+  }
+}
+
+module.exports = { createPost, deletePost, getUserPosts, getFeed }
