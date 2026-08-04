@@ -29,10 +29,4 @@ router.post('/logout', logoutController)
 
 router.post('/logout-all', authMiddleware, logoutAllController)
 
-router.get('/me', authMiddleware, (req, res) => {
-  res.json({
-    success: true, user: req.user
-  })
-})
-
 module.exports = router;

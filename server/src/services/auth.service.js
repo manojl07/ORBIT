@@ -108,10 +108,10 @@ const login = async ({ identifier, password, deviceId, userAgent, ipAddress }) =
   }
 }
 
-const getMe = async(userId) => {
+const getMe = async (userId) => {
   const user = await User.findById(userId);
 
-  if(!user){
+  if (!user) {
     throw new ApiError(404, "User not found")
   }
 
@@ -119,6 +119,10 @@ const getMe = async(userId) => {
 }
 
 const refresh = async ({ refreshToken, deviceId, userAgent, ipAddress }) => {
+
+  if (!refreshToken) {
+    throw new ApiError(401, "Refresh token missing");
+  }
 
   const decoded = verifyRefreshToken(refreshToken);
 
@@ -169,9 +173,4 @@ const logoutAll = async (userId) => {
   return true;
 };
 
-
-
 module.exports = { register, login, getMe, refresh, logout, logoutAll };
-
-
-// right now ill copy paste all the code written for this project reading all files give the explation of all the files and their code in the flow how the data is flowing and these how they are woking from app.js, server.js to every controller, route, middleware, utils, validators, service, config, consonants etc,.

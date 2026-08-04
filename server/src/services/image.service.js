@@ -1,18 +1,18 @@
 const imagekit = require('../config/imagekit')
 
 
-const uploadImage = async(file) => {
+const uploadImage = async(file, folder = "/orbit") => {
   if(!file) return null;
 
   const response = await imagekit.upload({
     file: file.buffer,
     fileName: `${Date.now()}-${file.originalname}`,
-    folder: '/orbit/profile-images'
+    folder,
   })
 
   return {
     imageUrl: response.url,
-    fileId: response.fileId,
+    imageFileId: response.fileId,
   }
 }
 
