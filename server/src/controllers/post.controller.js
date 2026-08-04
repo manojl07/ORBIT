@@ -20,4 +20,14 @@ const deletePostController = asyncHandler(async (req, res) => {
   return res.status(200).json(new ApiResponse(200, "Post deleted successfully"))
 })
 
-module.exports = { createPostController, deletePostController }
+const getUserPostsController = asyncHandler(async (req, res) => {
+  const result = await postService.getUserPosts({
+    userId: req.params.userId,
+    page: Number(req.query.page) || 1,
+    limit: Number(req.query.limit) || 12,
+  })
+
+  return res.status(200).json(new ApiResponse(200, "Posts fetched successfully", result))
+})
+
+module.exports = { createPostController, deletePostController, getUserPostsController }
