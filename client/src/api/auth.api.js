@@ -1,7 +1,7 @@
 import API from './axios'
 
-export const registerUser = async (FormData) => {
-  const { data } = await API.post('/auth/register', FormData)
+export const registerUser = async (formData) => {
+  const { data } = await API.post('/auth/register', formData)
 
   return data;
 }
