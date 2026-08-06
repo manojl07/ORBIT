@@ -2,7 +2,6 @@ const jwt = require("jsonwebtoken");
 const asyncHandler = require("../utils/asyncHandler");
 
 const authMiddleware = asyncHandler(async (req, res, next) => {
-  console.log("Route:", req.method, req.originalUrl);
 
   let token = null;
 
@@ -23,7 +22,7 @@ const authMiddleware = asyncHandler(async (req, res, next) => {
     });
   }
 
-  console.log("Token:", token);
+
 
   const decoded = jwt.verify(
     token,

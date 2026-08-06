@@ -22,8 +22,6 @@ const createPost = async ({ caption, image, userId }) => {
 
   const uploadedImage = await uploadImage(image, "/orbit/post-images");
 
-  console.log(uploadedImage);
-
   const post = await Post.create({
     caption,
     imageUrl: uploadedImage.imageUrl,

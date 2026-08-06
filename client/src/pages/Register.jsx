@@ -45,8 +45,8 @@ const Register = () => {
     formData.append("password", formValues.password);
     formData.append("bio", formValues.bio || "")
 
-    if (formValues.profileImage?.[0]) {
-      formData.append("profileImage", formValues.profileImage[0])
+    if (formValues.profileImg?.[0]) {
+      formData.append("profileImg", formValues.profileImg[0])
     }
 
     registerMutation.mutate(formData)
@@ -70,7 +70,7 @@ const Register = () => {
             {...register("username", { required: "Username required" })}
             className='w-full p-3 rounded-lg bg-zinc-800 text-white' />
 
-          {errors.usename && (
+          {errors.username && (
             <p className='text-red-500 text-sm'>{errors.username.message}</p>
           )}
 
@@ -89,9 +89,9 @@ const Register = () => {
           )}
 
           <input
-            type="text"
+            type="password"
             placeholder='Password'
-            {...register("passowrd", {
+            {...register("password", {
               required: "Password is required"
             })}
             className='w-full p-3 rounded-lg bg-zinc-800 text-white' />
