@@ -41,6 +41,7 @@ const Login = () => {
     <div className='min-h-screen flex items-center justify-center bg-zinc-950'>
 
       <form onSubmit={handleSubmit(onSubmit)}
+        autoComplete='off'
         className='w-full max-w-md bg-zinc-900 p-8 rounded-2xl border border-zinc-800'>
 
         <h1 className='text-3xl font-bold text-white mb-6 text-center'>Login</h1>

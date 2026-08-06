@@ -6,14 +6,29 @@ import Profile from '../pages/Profile'
 
 import ProtectedRoute from '../layouts/ProtectedRoute'
 import { Route, Routes } from 'react-router-dom'
+import PublicRoute from '../layouts/PublicRoute'
 
 
 const AppRoutes = () => {
   return (
     <Routes>
-      <Route path='/login' element={<Login />} />
-      <Route path='/register' element={<Register />} />
-      <Route pth='/'
+      <Route
+        path='/login'
+        element={
+          <PublicRoute>
+            <Login />
+          </PublicRoute>
+        } />
+
+      <Route
+        path='/register'
+        element={
+          <PublicRoute>
+            <Register />
+          </PublicRoute>
+        }
+      />
+      <Route path='/'
         element={
           <ProtectedRoute>
             <Feed />
