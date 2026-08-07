@@ -20,7 +20,7 @@ router.delete('/:id', authMiddleware, deletePostController);
 
 router.get('/user/:userId', getUserPostsController)
 
-router.get('/feed', getFeedController)
+router.get('/feed', authMiddleware, getFeedController)
 
 router.post('/:postId/like', authMiddleware, toggleLikeController)
 

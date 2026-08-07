@@ -3,7 +3,7 @@ const ApiError = require("../utils/ApiError")
 
 const { uploadImage, deleteImage } = require("./image.service")
 
-const Like = require('../models/like.model') 
+const Like = require('../models/like.model')
 
 
 
@@ -74,21 +74,43 @@ const getUserPosts = async ({ userId, page = 1, limit = 12 }) => {
   }
 }
 
-const getFeed = async ({ page = 1, limit = 10 }) => {
+const getFeed = async ({ page = 1, limit = 10, userId }) => {
   const skip = (page - 1) * limit;
 
-  const [posts, total] = await Promise.all([
+  const [posts, total, userLikes] = await Promise.all([
     Post.find()
       .populate("user", "username profileImg")
       .sort({ createdAt: -1 })
       .skip(skip)
-      .limit(limit),
+      .limit(limit)
+      .lean(),
 
-    Post.countDocuments()
+
+
+    Post.countDocuments(),
+
+    Like.find({ user: userId }).select("post")
   ])
 
+  console.log("userId:", userId);
+
+  console.log("userLikes:", userLikes);
+
+
+
+  const likedPosts = new Set(userLikes.map(like => like.post.toString()))
+
+  console.log(likedPosts);
+
+  const formattedPosts = posts.map(post => ({
+    ...post,
+    isLiked: likedPosts.has(post._id.toString()),
+  }))
+
+  console.log(userId);
+
   return {
-    posts,
+    posts: formattedPosts,
     pagination: {
       page,
       limit,
@@ -98,17 +120,20 @@ const getFeed = async ({ page = 1, limit = 10 }) => {
   }
 }
 
-const toggleLike = async(postId, userId) => {
+const toggleLike = async (postId, userId) => {
+
+  console.log("postId:", postId);
+  console.log("userId:", userId);
 
   const post = await Post.findById(postId);
 
-  if(!post){
+  if (!post) {
     throw new ApiError(404, "Post not found");
   }
 
-  const existingLike = await Like.findOne({user: userId, post: postId});
+  const existingLike = await Like.findOne({ user: userId, post: postId });
 
-  if(existingLike){
+  if (existingLike) {
     await Like.findByIdAndDelete(existingLike._id);
 
     post.likesCount -= 1;
@@ -121,7 +146,9 @@ const toggleLike = async(postId, userId) => {
     }
   }
 
-  await Like.create({user:userId, post:postId})
+  await Like.create({ user: userId, post: postId })
+
+  console.log(await Like.find({}));
 
   post.likesCount += 1;
 
