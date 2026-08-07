@@ -92,22 +92,19 @@ const getFeed = async ({ page = 1, limit = 10, userId }) => {
     Like.find({ user: userId }).select("post")
   ])
 
-  console.log("userId:", userId);
-
-  console.log("userLikes:", userLikes);
 
 
 
   const likedPosts = new Set(userLikes.map(like => like.post.toString()))
 
-  console.log(likedPosts);
+
 
   const formattedPosts = posts.map(post => ({
     ...post,
     isLiked: likedPosts.has(post._id.toString()),
   }))
 
-  console.log(userId);
+
 
   return {
     posts: formattedPosts,
@@ -121,9 +118,6 @@ const getFeed = async ({ page = 1, limit = 10, userId }) => {
 }
 
 const toggleLike = async (postId, userId) => {
-
-  console.log("postId:", postId);
-  console.log("userId:", userId);
 
   const post = await Post.findById(postId);
 
@@ -147,8 +141,6 @@ const toggleLike = async (postId, userId) => {
   }
 
   await Like.create({ user: userId, post: postId })
-
-  console.log(await Like.find({}));
 
   post.likesCount += 1;
 
