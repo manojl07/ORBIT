@@ -13,3 +13,9 @@ export const getUserPosts = async ({ userId, page = 1, limit = 10 }) => {
 
   return data;
 }
+
+export const createPost = async (formData) => {
+  const {data} = await API.post('/posts', formData);
+
+  return data;
+}

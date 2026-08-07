@@ -54,10 +54,10 @@ const getUserPosts = async ({ userId, page = 1, limit = 12 }) => {
   const skip = (page - 1) * limit;
 
   const [posts, total] = await Promise.all([
-     Post.find({ user: userId })
-     .sort({ createAt: -1 })
-     .skip(skip)
-     .limit(limit),
+    Post.find({ user: userId })
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limit),
 
     Post.countDocuments({ user: userId })
   ])
@@ -65,20 +65,20 @@ const getUserPosts = async ({ userId, page = 1, limit = 12 }) => {
   return {
     posts: posts.map(sanitizePost),
     pagination: {
-      page, limit, total, totalPages: Math.ceil(total/limit)
+      page, limit, total, totalPages: Math.ceil(total / limit)
     }
   }
 }
 
-const getFeed = async({page=1, limit=10}) => {
+const getFeed = async ({ page = 1, limit = 10 }) => {
   const skip = (page - 1) * limit;
 
   const [posts, total] = await Promise.all([
     Post.find()
-    .populate("user", "username profileImg")
-    .sort({createdAt: -1})
-    .skip(skip)
-    .limit(limit),
+      .populate("user", "username profileImg")
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limit),
 
     Post.countDocuments()
   ])
@@ -89,7 +89,7 @@ const getFeed = async({page=1, limit=10}) => {
       page,
       limit,
       total,
-      totalPages: Math.ceil(total/limit)
+      totalPages: Math.ceil(total / limit)
     }
   }
 }

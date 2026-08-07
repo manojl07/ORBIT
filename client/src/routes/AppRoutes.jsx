@@ -7,6 +7,7 @@ import Profile from '../pages/Profile'
 import ProtectedRoute from '../layouts/ProtectedRoute'
 import { Route, Routes } from 'react-router-dom'
 import PublicRoute from '../layouts/PublicRoute'
+import MainLayout from '../layouts/MainLayout'
 
 
 const AppRoutes = () => {
@@ -31,14 +32,18 @@ const AppRoutes = () => {
       <Route path='/'
         element={
           <ProtectedRoute>
-            <Feed />
+            <MainLayout>
+              <Feed />
+            </MainLayout>
           </ProtectedRoute>
         }
       />
       <Route path='/profile'
         element={
           <ProtectedRoute>
-            <Profile />
+            <MainLayout>
+              <Profile />
+            </MainLayout>
           </ProtectedRoute>
         }
       />
