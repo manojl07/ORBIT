@@ -72,7 +72,11 @@ const refreshController = asyncHandler(async (req, res) => {
     ipAddress: req.ip,
   })
 
-  return res.status(200).json(new ApiResponse(200, "Token refreshed", result))
+  res.cookie("accessToken", result.accessToken, accessCookieOptions)
+
+  res.cookie("refreshToken", result.refreshToken, refreshCookieOptions)
+
+  return res.status(200).json(new ApiResponse(200, "Token refreshed", { sessionId: result.sessionId }))
 })
 
 const logoutController = asyncHandler(async (req, res) => {

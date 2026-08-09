@@ -82,7 +82,7 @@ const CreatePostModal = ({ isOpen, onClose }) => {
             value={caption}
             onChange={(e) => setCaption(e.target.value)}
             placeholder='Write a caption...'
-            className='w-full rounded-lg bg-zinc-800 text-white resize-none'
+            className='w-full rounded-lg bg-zinc-800 text-white p-2 resize-none'
           ></textarea>
 
           <div className='flex gap-2 mt-4'>

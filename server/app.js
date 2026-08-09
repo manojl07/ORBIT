@@ -6,6 +6,7 @@ const cookieParser = require('cookie-parser')
 
 const authRouter = require('./src/routes/auth.route')
 const postRouter = require('./src/routes/post.route')
+const commentRoutes = require('./src/routes/comment.route')
 
 const app = express();
 app.use(helmet())
@@ -23,6 +24,7 @@ app.use(express.urlencoded({
 // ROUTES
 app.use('/api/auth', authRouter)
 app.use('/api/posts', postRouter)
+app.use('/api/comments', commentRoutes)
 
 
 

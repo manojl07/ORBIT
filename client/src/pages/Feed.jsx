@@ -31,8 +31,6 @@ const Feed = () => {
   return (
     <div className='min-h-screen bg-black py-10'>
 
-      <Link to={`/profile`} className='text-white' >Profile</Link>
-
       <div className='max-w-2xl mx-auto space-y-6'>
 
         {data.data.posts.map((post) => (

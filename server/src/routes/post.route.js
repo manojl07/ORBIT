@@ -7,7 +7,8 @@ const validate = require('../middlewares/validate.middleware')
 
 const { createPostSchema } = require('../validators/post.validator')
 
-const { createPostController, deletePostController, getUserPostsController, getFeedController, toggleLikeController } = require("../controllers/post.controller")
+const { createPostController, deletePostController, getUserPostsController, getFeedController, toggleLikeController } = require("../controllers/post.controller");
+const { createCommentController, getCommentsController } = require('../controllers/comment.controller');
 
 router.post('/',
   authMiddleware,
@@ -23,5 +24,9 @@ router.get('/user/:userId', getUserPostsController)
 router.get('/feed', authMiddleware, getFeedController)
 
 router.post('/:postId/like', authMiddleware, toggleLikeController)
+
+router.post('/:postId/comments', authMiddleware, createCommentController);
+
+router.get('/:postId/comments', getCommentsController);
 
 module.exports = router;
