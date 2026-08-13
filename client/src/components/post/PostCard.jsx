@@ -58,62 +58,91 @@ const PostCard = ({ post }) => {
   })
 
   return (
-    <div className='bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden'>
+    <div className='bg-zinc-950 border border-zinc-800/70 rounded-2xl overflow-hidden shadow-[0_8px_30px_rgba(0,0,0,0.25)]'>
 
-      <div className='flex items-center gap-3 p-4'>
+      <div className="flex items-center justify-between px-4 py-3">
 
-        <img src={post.user.profileImg} alt={post.user.username} className='w-10 h-10 rounded-full object-cover' />
+        <div className="flex items-center gap-3 py-1">
+          <img
+            src={post.user.profileImg}
+            alt={post.user.username}
+            className="w-9 h-9 rounded-full object-cover ring-1 ring-zinc-700"
+          />
 
-        <div>
-          <h3 className='text-white font-semibold'>{post.user.username}</h3>
+          <div>
+            <h3 className="text-sm text-white font-semibold">
+              {post.user.username}
+            </h3>
+          </div>
         </div>
       </div>
 
-      <img src={post.imageUrl} alt="Post" className='w-full aspect-square object-cover' />
+      <img src={post.imageUrl} alt="Post" className='w-full aspect-[1.05/1]object-cover bg-zinc-900' />
 
-      <div className='p-4'>
+      <div className="px-4 py-3">
+
         <div className="flex items-center gap-5 text-white">
 
           {/* Like */}
           <button
             onClick={() => likeMutation.mutate()}
             disabled={likeMutation.isPending}
-            className="flex items-center gap-2"
+            className="flex items-center gap-2 active:scale-90 transition-transform"
           >
             <Heart
-              size={22}
+              size={21}
               fill={post.isLiked ? "currentColor" : "none"}
               className={`transition-all duration-200 ${post.isLiked
                 ? "text-red-500 scale-110"
-                : "text-white"
+                : "text-zinc-200"
                 }`}
             />
 
-            <span>{post.likesCount}</span>
+            <span className="text-sm">
+              {post.likesCount}
+            </span>
           </button>
-
 
           {/* Comments */}
           <button
             onClick={() => setIsCommentOpen(true)}
-            className="flex items-center gap-2"
+            className="flex items-center gap-2 active:scale-90 transition-transform"
           >
             <MessageCircle
-              size={22}
-              className="text-white"
+              size={21}
+              className="text-zinc-200"
             />
 
-            <span>{post.commentsCount}</span>
+            <span className="text-sm">
+              {post.commentsCount}
+            </span>
           </button>
 
         </div>
 
+        {/* Caption */}
         {post.caption && (
-          <p className='text-zinc-300 mt-3'>
-            <span className='font-semibold text-white mr-2'>{post.user.username}</span>
+          <p className="mt-3 text-sm leading-5 text-zinc-300">
+            <span className="font-semibold text-white mr-2">
+              {post.user.username}
+            </span>
+
             {post.caption}
           </p>
         )}
+
+        {/* Comments */}
+        {post.commentsCount > 0 && (
+          <button
+            onClick={() => setIsCommentOpen(true)}
+            className="mt-2 text-sm text-zinc-500 hover:text-zinc-300 transition-colors" >View all {post.commentsCount} comments</button>
+        )}
+
+        {/* Date */}
+        <p className="mt-2 text-[10px] font-medium tracking-widest text-zinc-600  uppercase">
+          {new Date(post.createdAt).toLocaleDateString("en-US", {month: "short", day: "numeric", year: "numeric",})}
+        </p>
+
       </div>
 
       <CommentModal

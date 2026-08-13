@@ -1,52 +1,190 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useMutation, useQuery, useQueryClient, } from "@tanstack/react-query";
+import { createComment, deleteComment, getComments, } from "../../api/comment.api";
+import { useAuth } from '../../hooks/useAuth'
 
-import { createComment, getComments, } from "../../api/comment.api";
+
 
 const CommentModal = ({ isOpen, onClose, post, }) => {
+
+  const { user } = useAuth();
 
   const inputRef = useRef(null);
   const [content, setContent] = useState("");
   const queryClient = useQueryClient();
 
-  const {data, isLoading,} = useQuery({
-    queryKey: ["comments", post._id],
+  /*
+ ========================================
+ GET COMMENTS
+ ========================================
+ */
 
-    queryFn: () =>
-      getComments(post._id),
+  const { data, isLoading, isError } = useQuery({
+    queryKey: ["comments", post?._id],
 
-    enabled: !!post,
+    queryFn: () => getComments(post._id),
+
+    enabled: isOpen && !!post?._id,
   });
+
+  /*
+========================================
+CREATE COMMENT
+========================================
+*/
 
   const createMutation = useMutation({
     mutationFn: createComment,
-    onSuccess: () => {
-      setContent("");
+
+    // Optimistic update
+    onMutate: async (newComment) => {
+      await queryClient.cancelQueries({
+        queryKey: ["comments", post._id]
+      })
+
+      // Take snapshot BEFORE changing cache
+      const previousComments = queryClient.getQueryData(["comments", post._id])
+
+      // Immediately add comment to UI
+      queryClient.setQueryData(["comments", post._id], (oldData) => {
+        if (!oldData) return oldData;
+
+        const optimisticComment = {
+          id: `temp-${Date.now()}`,
+          content: newComment.content,
+          user: {
+            id: user?.id,
+            username: user?.username,
+            profileImg: user?.profileImg,
+          },
+          createdAt: new Date(),
+        };
+
+        return {
+          ...oldData,
+
+          data: [
+            optimisticComment,
+            ...oldData.data,
+          ]
+        }
+      })
+
+      return { previousComments }
+    },
+
+    // If API fails restore previous comments
+    onError: (err, variable, context) => {
+      if (context?.previousComments) {
+        queryClient.setQueryData(["comments", post._id], context.previousComments);
+      }
+    },
+
+    // API finished successfully or unsuccessfully
+    onSettled: () => {
       queryClient.invalidateQueries({
-        queryKey: ["comments", post._id],
-      });
+        queryKey: ["comments", post._id]
+      })
 
       queryClient.invalidateQueries({
         queryKey: ["feed"],
-      });
+      })
+    },
+
+    // Only UI-specific success work here
+    onSuccess: () => {
+      setContent("");
     },
   });
 
+
+  /*
+========================================
+DELETE COMMENT
+========================================
+*/
+  const deleteMutation = useMutation({
+    mutationFn: deleteComment,
+
+    // Optimistic delete
+    onMutate: async (commentId) => {
+      await queryClient.cancelQueries({
+        queryKey: ["comments", post._id],
+      })
+
+      // Save current comments
+      const previousComments = queryClient.getQueryData(["comments", post._id])
+
+      // Remove comment immediately
+      queryClient.setQueryData(["comments", post._id], (oldData) => {
+        if (!oldData) return oldData;
+
+        return {
+          ...oldData,
+          data: oldData.data.filter((comment) => comment.id !== commentId)
+        }
+      })
+
+      return { previousComments }
+    },
+
+    // DELETE API failed Restore comment
+    onError: (error, commentId, context) => {
+      if (context?.previousComments) {
+        queryClient.setQueryData(["comments", post._id], context.previousComments)
+        console.error("Delete comment failed:", error);
+      }
+    },
+
+    // Sync with backend
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ["comments", post._id] })
+      queryClient.invalidateQueries({ queryKey: ["feed"] })
+    }
+  })
+
+  /*
+========================================
+SUBMIT COMMENT
+========================================
+*/
   const handleSubmit = () => {
-    if (!content.trim()) return;
+    const trimmedContent = content.trim();
+
+    if (!trimmedContent) return;
 
     createMutation.mutate({
       postId: post._id,
-      content: content.trim(),
-    });
-  };
+      content: trimmedContent,
+    })
+  }
 
+  /*
+========================================
+DELETE COMMENT
+========================================
+*/
+
+  const handleDelete = (commentId) => {
+    deleteMutation.mutate(commentId);
+  }
+
+  /*
+========================================
+AUTO FOCUS
+========================================
+*/
   useEffect(() => {
-    if(isOpen){
+    if (isOpen) {
       inputRef.current?.focus();
     }
   }, [isOpen])
 
+  /*
+========================================
+MODAL CLOSED
+========================================
+*/
   if (!isOpen) return null;
 
   return (
@@ -86,21 +224,31 @@ const CommentModal = ({ isOpen, onClose, post, }) => {
             </p>
           ) : (
             data?.data?.map((comment) => (
-              <div key={comment.id} className="flex gap-3 mb-4">
+              <div key={comment.id} className="gropu flex items-start gap-3 mb-4">
 
-                <img src={comment.user.profileImg} alt="" className="w-8 h-8 rounded-full object-cover" />
+                <img src={comment.user.profileImg} alt="" className="w-8 h-8 rounded-full object-cover shrink-0" />
 
-                <div>
-
+                <div className="flex-1 min-w-0">
                   <p className="text-white font-semibold">
                     {comment.user.username}
                   </p>
-                  <p className="text-zinc-300">
+                  <p className="text-zinc-300 wrap-break-word">
                     {comment.content}
                   </p>
 
                 </div>
 
+
+                {comment.user.id === user.id && (
+                  <button
+                    type="button"
+                    onClick={() => handleDelete(comment.id)}
+                    disabled={deleteMutation.isPending}
+                    className="text-xs  text-zinc-500 hover:text-red-500 transition-colors duration-200 group-hover:opacity-100 disabled:opacity-50"
+                    title="Delete comment" >
+                    {deleteMutation.isPending ? 'Deleting...' : "Delete"}
+                  </button>
+                )}
               </div>
 
             ))
