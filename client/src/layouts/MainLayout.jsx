@@ -1,6 +1,6 @@
 import { useState } from "react"
 import Navbar from "./Navbar";
-import CreatePostModal from "../conponents/post/CreatePostModal";
+import CreatePostModal from "../components/post/CreatePostModal";
 
 
 const MainLayout = ({ children }) => {

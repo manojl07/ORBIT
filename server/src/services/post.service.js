@@ -85,26 +85,17 @@ const getFeed = async ({ page = 1, limit = 10, userId }) => {
       .limit(limit)
       .lean(),
 
-
-
     Post.countDocuments(),
 
     Like.find({ user: userId }).select("post")
   ])
 
-
-
-
   const likedPosts = new Set(userLikes.map(like => like.post.toString()))
-
-
 
   const formattedPosts = posts.map(post => ({
     ...post,
     isLiked: likedPosts.has(post._id.toString()),
   }))
-
-
 
   return {
     posts: formattedPosts,

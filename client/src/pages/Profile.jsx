@@ -2,9 +2,9 @@ import { useQuery } from '@tanstack/react-query'
 import React from 'react'
 import { getMe } from '../api/auth.api'
 import { getUserPosts } from '../api/post.api'
-import Loader from '../conponents/ui/Loader'
-import ProfileHeader from '../conponents/profile/ProfileHeader'
-import ProfilePostsGrid from '../conponents/profile/ProfilePostsGrid'
+import Loader from '../components/ui/Loader'
+import ProfileHeader from '../components/profile/ProfileHeader'
+import ProfilePostsGrid from '../components/profile/ProfilePostsGrid'
 import {useAuth} from '../hooks/useAuth'
 
 

@@ -1,10 +1,10 @@
 import { useQuery } from '@tanstack/react-query'
 import React from 'react'
 import { getFeed } from '../api/post.api'
-import PostCard from '../conponents/post/PostCard'
+import PostCard from '../components/post/PostCard'
 import { Link } from 'react-router-dom'
 import { getMe } from '../api/auth.api'
-import Loader from '../conponents/ui/Loader'
+import Loader from '../components/ui/Loader'
 
 const Feed = () => {
 
@@ -17,7 +17,7 @@ const Feed = () => {
 
   if (isLoading) {
     return (
-    <Loader />
+      <Loader />
     )
   }
 

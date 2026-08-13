@@ -1,12 +1,15 @@
 import React from 'react'
-import { Heart } from 'lucide-react'
+import { Heart, MessageCircle } from 'lucide-react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 
 import { toggleLike } from '../../api/post.api'
-import { data } from 'react-router-dom'
+import { useState } from 'react'
+import CommentModal from '../comment/CommentModal'
 
 
 const PostCard = ({ post }) => {
+
+  const [isCommentOpen, setIsCommentOpen] = useState(false);
 
   const queryClient = useQueryClient();
 
@@ -26,7 +29,7 @@ const PostCard = ({ post }) => {
           data: {
             ...oldData.data,
             posts: oldData.data.posts.map((p) => {
-              if (p.id !== post.id) {
+              if (p._id !== post.id) {
                 return p;
               }
 
@@ -69,17 +72,40 @@ const PostCard = ({ post }) => {
       <img src={post.imageUrl} alt="Post" className='w-full aspect-square object-cover' />
 
       <div className='p-4'>
-        <div className='flex gap-4 text-white'>
-          <button onClick={() => likeMutation.mutate()} className='flex items-center gap-2' disabled={likeMutation.isPending}>
+        <div className="flex items-center gap-5 text-white">
 
-            <Heart size={22} fill={post.isLiked ? "currentColor" : "none"} className={`transition-all duration-200 ${post.isLiked
+          {/* Like */}
+          <button
+            onClick={() => likeMutation.mutate()}
+            disabled={likeMutation.isPending}
+            className="flex items-center gap-2"
+          >
+            <Heart
+              size={22}
+              fill={post.isLiked ? "currentColor" : "none"}
+              className={`transition-all duration-200 ${post.isLiked
                 ? "text-red-500 scale-110"
                 : "text-white"
-              }
-  `} />
-            {post.likesCount}
+                }`}
+            />
 
+            <span>{post.likesCount}</span>
           </button>
+
+
+          {/* Comments */}
+          <button
+            onClick={() => setIsCommentOpen(true)}
+            className="flex items-center gap-2"
+          >
+            <MessageCircle
+              size={22}
+              className="text-white"
+            />
+
+            <span>{post.commentsCount}</span>
+          </button>
+
         </div>
 
         {post.caption && (
@@ -89,6 +115,12 @@ const PostCard = ({ post }) => {
           </p>
         )}
       </div>
+
+      <CommentModal
+        isOpen={isCommentOpen}
+        onClose={() => setIsCommentOpen(false)}
+        post={post}
+      />
 
     </div>
 
