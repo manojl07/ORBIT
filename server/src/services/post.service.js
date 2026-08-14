@@ -9,9 +9,11 @@ const Like = require('../models/like.model')
 
 const sanitizePost = (post) => ({
   id: post._id,
+  _id: post._id,
   caption: post.caption,
   imageUrl: post.imageUrl,
   likesCount: post.likesCount,
+  isLiked: post.isLiked ?? false,
   commentsCount: post.commentsCount,
   isEdited: post.isEdited,
   user: post.user,
@@ -54,20 +56,34 @@ const deletePost = async (postId, userId) => {
   return true;
 }
 
-const getUserPosts = async ({ userId, page = 1, limit = 12 }) => {
+const getUserPosts = async ({ userId, currentUserId, page = 1, limit = 12 }) => {
   const skip = (page - 1) * limit;
 
-  const [posts, total] = await Promise.all([
+  const [posts, total, userLikes] = await Promise.all([
     Post.find({ user: userId })
+      .populate("user", "username profileImg")
       .sort({ createdAt: -1 })
       .skip(skip)
-      .limit(limit),
+      .limit(limit)
+      .lean(),
 
-    Post.countDocuments({ user: userId })
+    Post.countDocuments({ user: userId }),
+
+    Like.find({ user: currentUserId }).select("post")
   ])
 
+  const likedPosts = new Set(userLikes.map((like) => like.post.toString()))
+
+  const formattedPosts = posts.map((post) => ({
+    ...post,
+    isLiked: likedPosts.has(post._id.toString()),
+    user: {
+      ...post.user,
+    }
+  }))
+
   return {
-    posts: posts.map(sanitizePost),
+    posts: formattedPosts.map(sanitizePost),
     pagination: {
       page, limit, total, totalPages: Math.ceil(total / limit)
     }

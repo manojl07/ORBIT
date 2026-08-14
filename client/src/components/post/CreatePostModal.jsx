@@ -75,14 +75,19 @@ const CreatePostModal = ({ isOpen, onClose }) => {
           />
 
           {preview && (
-            <img src={preview} alt="" className='w-full rounded-lg mb-4' />
+            <div className="h-[560px] sm:h-[220px]">
+              <img
+                src={preview}
+                className="w-full h-full object-contain"
+              />
+            </div>
           )}
 
           <textarea
             value={caption}
             onChange={(e) => setCaption(e.target.value)}
             placeholder='Write a caption...'
-            className='w-full rounded-lg bg-zinc-800 text-white p-2 resize-none'
+            className='w-full rounded-lg bg-zinc-800 text-white p-2 md:p-1 resize-none'
           ></textarea>
 
           <div className='flex gap-2 mt-4'>
@@ -97,7 +102,7 @@ const CreatePostModal = ({ isOpen, onClose }) => {
               }
             </button>
 
-            <button type='button' onClick={onClose} className='flex-1 bg-zinc-700 text-white p3 rounded-lg'>
+            <button type='button' onClick={onClose} className='flex-1 bg-zinc-700 text-white py-3 rounded-lg'>
               Cancel
             </button>
 

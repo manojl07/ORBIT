@@ -1,1 +1,40 @@
 @import "tailwindcss";
+
+/* =========================================
+   Instagram-style scroll container
+========================================= */
+
+.instagram-scroll {
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(113, 113, 122, 0.45) transparent;
+}
+
+/* Chrome / Edge / Safari */
+.instagram-scroll::-webkit-scrollbar {
+  width: 4px;
+}
+
+.instagram-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.instagram-scroll::-webkit-scrollbar-thumb {
+  background: rgba(113, 113, 122, 0.45);
+  border-radius: 9999px;
+}
+
+.instagram-scroll::-webkit-scrollbar-thumb:hover {
+  background: rgba(161, 161, 170, 0.7);
+}
+
+/* Mobile: completely hide scrollbar */
+@media (max-width: 999px) {
+  .instagram-scroll {
+    scrollbar-width: none;
+  }
+
+  .instagram-scroll::-webkit-scrollbar {
+    display: none;
+  }
+}

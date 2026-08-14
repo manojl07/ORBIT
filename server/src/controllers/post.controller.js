@@ -23,6 +23,7 @@ const deletePostController = asyncHandler(async (req, res) => {
 const getUserPostsController = asyncHandler(async (req, res) => {
   const result = await postService.getUserPosts({
     userId: req.params.userId,
+    currentUserId: req.user.id,
     page: Number(req.query.page) || 1,
     limit: Number(req.query.limit) || 12,
   })

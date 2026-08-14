@@ -19,7 +19,7 @@ router.post('/',
 
 router.delete('/:id', authMiddleware, deletePostController);
 
-router.get('/user/:userId', getUserPostsController)
+router.get('/user/:userId', authMiddleware, getUserPostsController)
 
 router.get('/feed', authMiddleware, getFeedController)
 
