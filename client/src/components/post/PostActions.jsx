@@ -1,10 +1,13 @@
 import React from "react";
-import {Heart, MessageCircle,} from "lucide-react";
-import {useMutation, useQueryClient,} from "@tanstack/react-query";
+import { Heart, MessageCircle, } from "lucide-react";
+import { useMutation, useQueryClient, } from "@tanstack/react-query";
 import { toggleLike } from "../../api/post.api";
+import { useAuth } from "../../hooks/useAuth";
 
 
-const PostActions = ({post, queryKey, onCommentClick,}) => {
+const PostActions = ({ post, queryKey, onCommentClick, }) => {
+
+  const { user } = useAuth();
 
   const queryClient = useQueryClient();
 
@@ -13,80 +16,64 @@ const PostActions = ({post, queryKey, onCommentClick,}) => {
   const likeMutation = useMutation({
     mutationFn: () => toggleLike(postId),
     onMutate: async () => {
-      /*
-      1. Stop an existing refetch
-      */
-      await queryClient.cancelQueries({queryKey,});
-      /*
-      2. Save current cache
-      */
+
+      /* 1. Stop an existing refetch */
+      await queryClient.cancelQueries({ queryKey, });
+
+      /* 2. Save current cache */
       const previousData = queryClient.getQueryData(queryKey);
-      /*
-      3. Optimistically update cache
-      */
+
+      /* 3. Optimistically update cache */
       queryClient.setQueryData(queryKey, (oldData) => {
-          if (!oldData) {
-            return oldData;
-          }
-          /*
-          Feed response shape:
-          oldData
-            ↓
-          data
-            ↓
-          posts
-        */
-          if (!oldData.data?.posts) {
-            return oldData;
-          }
-
-
-          return {
-            ...oldData,
-            data: {
-              ...oldData.data,
-              posts: oldData.data.posts.map(
-                (p) => {
-
-                  const currentId = p._id ?? p.id;
-                  /*
-                  Not our post
-                  */
-                  if (currentId !== postId) {
-                    return p;
-                  }
-                  /*
-                  Our post
-                  */
-                  return {
-                    ...p,
-                    isLiked: !p.isLiked,
-                    likesCount: p.isLiked
-                      ? Math.max(0, p.likesCount - 1)
-                      : p.likesCount + 1,
-                  };
-                }
-              ),
-            },
-          };
+        if (!oldData) {
+          return oldData;
         }
+
+        /* Feed response shape:
+        oldData
+          ↓
+        data
+          ↓
+        posts */
+        if (!oldData.data?.posts) {
+          return oldData;
+        }
+
+
+        return {
+          ...oldData,
+          data: {
+            ...oldData.data,
+            posts: oldData.data.posts.map((p) => {
+
+              const currentId = p._id ?? p.id;
+              /* Not our post */
+              if (currentId !== postId) {
+                return p;
+              }
+              /* Our post */
+              return {
+                ...p,
+                isLiked: !p.isLiked,
+                likesCount: p.isLiked
+                  ? Math.max(0, p.likesCount - 1)
+                  : p.likesCount + 1,
+              };
+            }
+            ),
+          },
+        };
+      }
       );
 
 
-      /*
-      4. Give rollback data to onError
-      */
+      /* 4. Give rollback data to onError */
 
-      return {
-        previousData,
-      };
+      return { previousData, };
     },
 
 
-    /*
-    If API fails:
-    restore old cache
-    */
+    /* If API fails: restore old cache */
 
     onError: (error, variables, context) => {
       if (context?.previousData) {
@@ -94,14 +81,11 @@ const PostActions = ({post, queryKey, onCommentClick,}) => {
       }
     },
 
-    /*
-    After API finishes:
-    sync with backend
-    */
+    /* After API finishes: sync with backend */
     onSettled: () => {
-      queryClient.invalidateQueries({queryKey,});
-      queryClient.invalidateQueries({queryKey: ["feed"]})
-      queryClient.invalidateQueries({queryKey: ["user-posts"]})
+      queryClient.invalidateQueries({ queryKey, });
+      queryClient.invalidateQueries({ queryKey: ["feed"] })
+      queryClient.invalidateQueries({ queryKey: ["user-posts"] })
     },
   });
 

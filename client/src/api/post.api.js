@@ -26,3 +26,9 @@ export const toggleLike = async (postId) => {
 
   return data;
 }
+
+export const deletePost = async (postId) => {
+  const {data} = await API.delete(`/posts/${postId}`);
+
+  return data;
+}
