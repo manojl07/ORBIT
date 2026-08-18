@@ -8,6 +8,8 @@ import ProfilePostsGrid from '../components/profile/ProfilePostsGrid'
 import { useAuth } from '../hooks/useAuth'
 import PostModal from '../components/post/PostModal'
 
+import SkeletonGrid from "../components/UI/SkeletonGrid";
+
 
 const Profile = () => {
 
@@ -27,7 +29,17 @@ const Profile = () => {
   });
 
   if (isAuthLoading || postsLoading) {
-    return <Loader />
+    return (
+      <div className="min-h-screen bg-black">
+
+        <div className="max-w-4xl mx-auto py-10">
+
+          <SkeletonGrid />
+
+        </div>
+
+      </div>
+    );
   }
 
 

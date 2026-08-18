@@ -20,6 +20,9 @@ import Loader from "../ui/Loader";
 import CommentItem from "./CommentItem";
 import { queryKeys } from "../../constants/queryKey";
 
+import SkeletonComments from "../UI/SkeletonComments";
+import EmptyState from "../UI/EmptyState";
+
 
 const CommentList = ({
   postId,
@@ -85,9 +88,9 @@ const CommentList = ({
   // LOADING
   // ========================================
 
-  if (isLoading) {
-    return <Loader />;
-  }
+if (isLoading) {
+  return <SkeletonComments />;
+}
 
 
   // ========================================
@@ -107,13 +110,15 @@ const CommentList = ({
   // EMPTY
   // ========================================
 
-  if (!data?.data?.length) {
-    return (
-      <p className="text-zinc-500 text-center py-6">
-        No comments yet
-      </p>
-    );
-  }
+if (!data?.data?.length) {
+  return (
+    <EmptyState
+      icon="💬"
+      title="No Comments Yet"
+      description="Start the conversation."
+    />
+  );
+}
 
 
   // ========================================

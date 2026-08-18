@@ -5,6 +5,8 @@ import PostCard from '../components/post/PostCard'
 import { Link } from 'react-router-dom'
 import Loader from '../components/ui/Loader'
 
+import SkeletonCard from "../components/UI/SkeletonCard";
+
 const Feed = () => {
 
   const { data, isLoading, isError, error } = useQuery({
@@ -14,11 +16,21 @@ const Feed = () => {
 
   })
 
-  if (isLoading) {
-    return (
-      <Loader />
-    )
-  }
+if (isLoading) {
+  return (
+    <div className="min-h-screen bg-black py-10">
+
+      <div className="max-w-lg mx-auto space-y-5">
+
+        {[...Array(5)].map((_, index) => (
+          <SkeletonCard key={index} />
+        ))}
+
+      </div>
+
+    </div>
+  );
+}
 
   if (isError) {
     return (

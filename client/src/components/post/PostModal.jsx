@@ -97,7 +97,7 @@ const PostModal = ({
     <>
       <div
         className="
-          fixed inset-0 z-50
+          fixed inset-0 z-150
           bg-black/90
           flex items-center justify-center
           p-0

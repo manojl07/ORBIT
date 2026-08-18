@@ -5,6 +5,8 @@ import {createComment,} from "../../api/comment.api";
 import {useAuth,} from "../../hooks/useAuth";
 import { queryKeys } from "../../constants/queryKey";
 
+import ButtonSpinner from "../ui/ButtonSpinner";
+
 
 const CommentInput = ({postId, queryKey, onCommentCreated,}) => {
 
@@ -112,28 +114,42 @@ const CommentInput = ({postId, queryKey, onCommentCreated,}) => {
 
 
   return (
-    <div className="border-t border-zinc-800 p-4 flex gap-2 ">
+<div className="p-4 flex gap-2">
 
-      <input value={content} onChange={(e) => setContent(e.target.value)}
-        onKeyDown={(e) => {
-          if (e.key === "Enter") {
-            handleSubmit();
-          }
-        }}
-        placeholder="Add a comment..."
+  <input
+    type="text"
+    value={content}
+    disabled={createMutation.isPending}
+    onChange={(e) => setContent(e.target.value)}
+    placeholder="Add a comment..."
+    className="flex-1 bg-zinc-800 text-white rounded-lg p-3 outline-none disabled:opacity-60"
+    onKeyDown={(e) => {
+      if (e.key === "Enter" && !e.shiftKey) {
+        e.preventDefault();
+        handleSubmit();
+      }
+    }}
+  />
 
-        className="flex-1 bg-zinc-800 text-white rounded-lg p-3 outline-none focus:ring-2 focus:ring-zinc-600 " />
+  <button
+    onClick={handleSubmit}
+    disabled={
+      createMutation.isPending ||
+      !content.trim()
+    }
+    className="min-w-27.5 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg px-4 text-white flex items-center justify-center gap-2 transition"
+  >
+    {createMutation.isPending ? (
+      <>
+        <ButtonSpinner size={16} />
+        Posting...
+      </>
+    ) : (
+      "Post"
+    )}
+  </button>
 
-
-      <button onClick={handleSubmit}
-        disabled={createMutation.isPending || !content.trim()}
-        className="bg-blue-600 hover:bg-blue-500 text-white  px-5 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
-        {createMutation.isPending
-          ? "..."
-          : "Post"}
-      </button>
-
-    </div>
+</div>
   );
 };
 

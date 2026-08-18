@@ -7,31 +7,31 @@ export const registerUser = async (formData) => {
 }
 
 export const loginUser = async (body) => {
-  const {data} = await API.post('/auth/login', body)
+  const { data } = await API.post('/auth/login', body)
 
   return data;
 }
 
 export const getMe = async () => {
-  const {data} = await API.get('/auth/me');
+  const { data } = await API.get('/auth/me');
 
   return data;
 }
 
 export const logoutUser = async () => {
-  const {data} = await API.post('auth/logout')
+  const { data } = await API.post('auth/logout', { sessionId: null })
 
   return data;
 }
 
 export const logoutAllDevices = async () => {
-  const {data} = await API.post('/auth/logout-all');
+  const { data } = await API.post('/auth/logout-all');
 
   return data;
 }
 
 export const updateProfile = async (formData) => {
-  const {data} = await API.patch('/auth/profile', formData)
+  const { data } = await API.patch('/auth/profile', formData)
 
   return data;
 }
