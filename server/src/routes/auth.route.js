@@ -1,11 +1,11 @@
 const express = require('express')
 const router = express.Router();
 
-const { registerController, loginController, refreshController, logoutController, logoutAllController, getMeController } = require('../controllers/auth.controller')
+const { registerController, loginController, refreshController, logoutController, logoutAllController, getMeController, updateProfileController } = require('../controllers/auth.controller')
 
 const validate = require('../middlewares/validate.middleware')
 
-const { registerSchema, loginSchema, refreshSchema, logoutSchema } = require('../validators/auth.validator')
+const { registerSchema, loginSchema, refreshSchema, logoutSchema, updateProfileSchema } = require('../validators/auth.validator')
 
 const upload = require('../middlewares/upload.middleware')
 
@@ -28,5 +28,7 @@ router.post('/refresh', refreshController)
 router.post('/logout', logoutController)
 
 router.post('/logout-all', authMiddleware, logoutAllController)
+
+router.patch('/profile', authMiddleware, upload.single("profileImg"), validate(updateProfileSchema), updateProfileController)
 
 module.exports = router;

@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import PostActions from "./PostActions";
 import CommentModal from "../comment/CommentModal";
+import { queryKeys } from "../../constants/queryKey";
 
 const PostCard = ({ post }) => {
 
@@ -49,7 +50,7 @@ const PostCard = ({ post }) => {
         {/* Like + Comment */}
         <PostActions
           post={post}
-          queryKey={["feed"]}
+          queryKey={queryKeys.feed}
           onCommentClick={() =>
             setIsCommentOpen(true)
           }

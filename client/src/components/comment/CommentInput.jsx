@@ -3,6 +3,7 @@ import {useMutation, useQueryClient,} from "@tanstack/react-query";
 
 import {createComment,} from "../../api/comment.api";
 import {useAuth,} from "../../hooks/useAuth";
+import { queryKeys } from "../../constants/queryKey";
 
 
 const CommentInput = ({postId, queryKey, onCommentCreated,}) => {
@@ -89,7 +90,7 @@ const CommentInput = ({postId, queryKey, onCommentCreated,}) => {
       // Refresh comments
       queryClient.invalidateQueries({queryKey,});
       // Refresh feed counts
-      queryClient.invalidateQueries({queryKey: ["feed"],});
+      queryClient.invalidateQueries({queryKey: queryKeys.feed});
       // Refresh profile posts counts
       queryClient.invalidateQueries({queryKey: ["user-posts"],});
     },

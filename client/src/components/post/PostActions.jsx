@@ -2,12 +2,10 @@ import React from "react";
 import { Heart, MessageCircle, } from "lucide-react";
 import { useMutation, useQueryClient, } from "@tanstack/react-query";
 import { toggleLike } from "../../api/post.api";
-import { useAuth } from "../../hooks/useAuth";
+import { queryKeys } from "../../constants/queryKey";
 
 
 const PostActions = ({ post, queryKey, onCommentClick, }) => {
-
-  const { user } = useAuth();
 
   const queryClient = useQueryClient();
 
@@ -84,7 +82,7 @@ const PostActions = ({ post, queryKey, onCommentClick, }) => {
     /* After API finishes: sync with backend */
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey, });
-      queryClient.invalidateQueries({ queryKey: ["feed"] })
+      queryClient.invalidateQueries({ queryKey: queryKeys.feed })
       queryClient.invalidateQueries({ queryKey: ["user-posts"] })
     },
   });

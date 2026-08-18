@@ -6,6 +6,7 @@ import {
 import toast from "react-hot-toast";
 
 import { deletePost } from "../api/post.api";
+import { queryKeys } from "../constants/queryKey";
 
 
 const getPostId = (post) => {
@@ -83,7 +84,7 @@ const useDeletePost = ({
 
       await Promise.all([
         queryClient.cancelQueries({
-          queryKey: ["feed"],
+          queryKey: queryKeys.feed,
         }),
 
         queryClient.cancelQueries({
@@ -115,7 +116,7 @@ const useDeletePost = ({
       // Remove immediately from feed
 
       queryClient.setQueryData(
-        ["feed"],
+        queryKeys.feed,
         (oldData) =>
           removePostFromCache(
             oldData,
@@ -164,7 +165,7 @@ const useDeletePost = ({
 
 
       queryClient.setQueryData(
-        ["feed"],
+        queryKeys.feed,
         context.previousFeed
       );
 
@@ -207,7 +208,7 @@ const useDeletePost = ({
     onSettled: () => {
 
       queryClient.invalidateQueries({
-        queryKey: ["feed"],
+        queryKey: queryKeys.feed,
       });
 
       queryClient.invalidateQueries({

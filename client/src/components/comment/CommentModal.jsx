@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from "react";
 import { useMutation, useQuery, useQueryClient, } from "@tanstack/react-query";
 import { createComment, deleteComment, getComments, } from "../../api/comment.api";
 import { useAuth } from '../../hooks/useAuth'
+import { queryKeys } from "../../constants/queryKey";
 
 
 
@@ -87,7 +88,7 @@ CREATE COMMENT
       })
 
       queryClient.invalidateQueries({
-        queryKey: ["feed"],
+        queryKey: queryKeys.key,
       })
     },
 
@@ -139,7 +140,7 @@ DELETE COMMENT
     // Sync with backend
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey: ["comments", post._id] })
-      queryClient.invalidateQueries({ queryKey: ["feed"] })
+      queryClient.invalidateQueries({ queryKey: queryKeys.feed })
     }
   })
 

@@ -18,6 +18,7 @@ import {
 import Loader from "../ui/Loader";
 
 import CommentItem from "./CommentItem";
+import { queryKeys } from "../../constants/queryKey";
 
 
 const CommentList = ({
@@ -66,7 +67,7 @@ const CommentList = ({
 
       // Refresh feed comment counts
       queryClient.invalidateQueries({
-        queryKey: ["feed"],
+        queryKey: queryKeys.feed,
       });
 
 

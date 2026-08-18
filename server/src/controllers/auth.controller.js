@@ -95,4 +95,15 @@ const logoutAllController = asyncHandler(async (req, res) => {
   return res.status(200).json(new ApiResponse(200, "Logged out from all devices"));
 })
 
-module.exports = { registerController, loginController, getMeController, refreshController, logoutController, logoutAllController }
+
+const updateProfileController = asyncHandler(async (req, res) => {
+  const updatedUser = await authService.updateProfile({
+    userId: req.user.id,
+    bio: req.body.bio,
+    profileImg: req.file,
+  })
+
+  return res.status(200).json(new ApiResponse(200, "Profile Updated successfully", updatedUser))
+})
+
+module.exports = { registerController, loginController, getMeController, refreshController, logoutController, logoutAllController, updateProfileController }

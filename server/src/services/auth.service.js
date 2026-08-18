@@ -5,7 +5,7 @@ const Session = require('../models/session.model')
 const ApiError = require('../utils/ApiError')
 const { createTokens } = require('./token.service')
 
-const { uploadImage } = require('../services/image.service')
+const { uploadImage, deleteImage } = require('../services/image.service')
 
 const { verifyRefreshToken } = require("../utils/jwt")
 
@@ -177,4 +177,33 @@ const logoutAll = async (userId) => {
   return true;
 };
 
-module.exports = { register, login, getMe, refresh, logout, logoutAll };
+const updateProfile = async ({userId, bio, profileImg}) => {
+  const user = await User.findById(userId)
+
+  if(!user) {
+    throw new ApiError(404, "User not found");
+  }
+
+  if(bio !== undefined) user.bio = bio;
+
+  if(profileImg){
+    if(user.profileImgFileId){
+      await deleteImage(user.profileImgFileId)
+    }
+
+    const uploaded = await uploadImage(profileImg, "/orbit/profile-images")
+
+    user.profileImg = uploaded.imageUrl;
+    user.profileImgFileId = uploaded.imageFileId;
+  }
+
+  await user.save();
+
+  const postsCount = await Post.countDocuments({user: user._id})
+
+  return {
+    ...sanitizeUser(user), postsCount
+  }
+}
+
+module.exports = { register, login, getMe, refresh, logout, logoutAll, updateProfile };

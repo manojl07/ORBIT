@@ -2,6 +2,7 @@ import React, { useState } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import toast from 'react-hot-toast'
 import { createPost } from '../../api/post.api'
+import { queryKeys } from '../../constants/queryKey'
 
 const CreatePostModal = ({ isOpen, onClose }) => {
 
@@ -14,7 +15,7 @@ const CreatePostModal = ({ isOpen, onClose }) => {
   const createPostMutation = useMutation({
     mutationFn: createPost,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["feed"] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.feed });
 
       toast.success("Post created 🚀")
 
