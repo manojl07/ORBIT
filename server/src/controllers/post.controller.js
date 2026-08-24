@@ -17,6 +17,8 @@ const createPostController = asynHandler(async (req, res) => {
 const deletePostController = asyncHandler(async (req, res) => {
   await postService.deletePost(req.params.id, req.user.id);
 
+    console.log("DELETE POST REQUEST:", {postId: req.params.id, userId: req.user?.id,});
+
   return res.status(200).json(new ApiResponse(200, "Post deleted successfully"))
 })
 

@@ -45,16 +45,29 @@ const deletePost = async (postId, userId) => {
     throw new ApiError(404, "Post not found");
   }
 
-  if (post.user.toString() !== userId) {
+  // Ownership check
+  if (String(post.user) !== String(userId)) {
     throw new ApiError(403, "Unauthorized");
   }
 
-  await deleteImage(post.imageFileId);
-
+  // Delete MongoDB record first
   await Post.findByIdAndDelete(postId);
 
+  // Image deletion is cleanup.
+  // It should NOT prevent the post from being deleted.
+  if (post.imageFileId) {
+    try {
+      await deleteImage(post.imageFileId);
+    } catch (error) {
+      console.error(
+        "Failed to delete image from ImageKit:",
+        error.message
+      );
+    }
+  }
+
   return true;
-}
+};
 
 const getUserPosts = async ({ userId, currentUserId, page = 1, limit = 12 }) => {
   const skip = (page - 1) * limit;

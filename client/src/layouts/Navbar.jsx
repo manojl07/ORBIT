@@ -217,7 +217,7 @@ const Navbar = ({ onOpenModal }) => {
 
                 rounded-full
 
-                p-1
+                p-1.5
 
                 hover:bg-zinc-900
 

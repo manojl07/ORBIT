@@ -4,20 +4,9 @@ import useDeletePost
   from "../../hooks/useDeletePost";
 
 
-const DeletePostDialog = ({
-  isOpen,
-  onClose,
-  post,
-  onDeleted,
-}) => {
+const DeletePostDialog = ({isOpen, onClose, post, onDeleted,}) => {
 
-  const {
-    deletePost,
-    isDeleting,
-  } = useDeletePost({
-    post,
-    onSuccess: onDeleted,
-  });
+  const {deletePost,isDeleting,} = useDeletePost({post, onSuccess: onDeleted,});
 
 
   if (!isOpen || !post) {
@@ -26,24 +15,8 @@ const DeletePostDialog = ({
 
 
   return (
-    <div
-      className="
-        fixed
-        inset-0
-
-        z-[100]
-
-        bg-black/70
-        backdrop-blur-sm
-
-        flex
-        items-center
-        justify-center
-
-        p-4
-      "
-      onClick={onClose}
-    >
+    <div className="fixed inset-0 z-[200] bg-black/70 backdrop-blur-sm flex items-center justify-center p-4"
+      onClick={onClose}>
 
       <div
         className="
@@ -107,34 +80,39 @@ const DeletePostDialog = ({
           <button
             type="button"
             disabled={isDeleting}
-            onClick={deletePost}
-            className="
-              w-full
-              py-4
+            onClick={ () => {
+               console.log("DELETE BTN CLICKED")
+              deletePost()
+            }}
 
-              text-red-500
-              font-semibold
-              text-sm
 
-              hover:bg-zinc-800
+          className="
+          w-full
+          py-4
 
-              transition
+          text-red-500
+          font-semibold
+          text-sm
 
-              disabled:opacity-50
-              disabled:cursor-not-allowed
-            "
+          hover:bg-zinc-800
+
+          transition
+
+          disabled:opacity-50
+          disabled:cursor-not-allowed
+          "
           >
-            {isDeleting
-              ? "Deleting..."
-              : "Delete"}
-          </button>
+          {isDeleting
+            ? "Deleting..."
+            : "Delete"}
+        </button>
 
 
-          <button
-            type="button"
-            disabled={isDeleting}
-            onClick={onClose}
-            className="
+        <button
+          type="button"
+          disabled={isDeleting}
+          onClick={onClose}
+          className="
               w-full
               py-4
 
@@ -150,15 +128,15 @@ const DeletePostDialog = ({
 
               disabled:opacity-50
             "
-          >
-            Cancel
-          </button>
-
-        </div>
+        >
+          Cancel
+        </button>
 
       </div>
 
     </div>
+
+    </div >
   );
 };
 

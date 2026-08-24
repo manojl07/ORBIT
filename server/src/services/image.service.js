@@ -1,8 +1,8 @@
 const imagekit = require('../config/imagekit')
 
 
-const uploadImage = async(file, folder = "/orbit") => {
-  if(!file) return null;
+const uploadImage = async (file, folder = "/orbit") => {
+  if (!file) return null;
 
   const response = await imagekit.upload({
     file: file.buffer,
@@ -16,10 +16,15 @@ const uploadImage = async(file, folder = "/orbit") => {
   }
 }
 
-const deleteImage = async(fileId) => {
+
+const deleteImage = async (fileId) => {
+  if (!fileId) {
+    return true;
+  }
+
   await imagekit.deleteFile(fileId);
 
   return true;
-}
+};
 
-module.exports = {uploadImage, deleteImage}
+module.exports = { uploadImage, deleteImage }
