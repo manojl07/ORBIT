@@ -4,6 +4,8 @@ import {
   Trash2,
   X,
 } from "lucide-react";
+import userProfileNavigation from "../../hooks/useProfileNavigation";
+import { useAuth } from "../../hooks/useAuth";
 
 const PostHeader = ({
   post,
@@ -12,6 +14,10 @@ const PostHeader = ({
   onDeleteClick,
 }) => {
   const [showMenu, setShowMenu] = useState(false);
+
+    const goToProfile = userProfileNavigation();
+
+    const { user } = useAuth();
 
   // Prevent crash if this component is ever rendered
   // before a post is available.
@@ -26,7 +32,11 @@ const PostHeader = ({
     <div
       className="relative z-50 flex items-center justify-between px-3 py-2 min-[500px]:px-4 min-[500px]:py-3 min-[1000px]:px-5 min-[1000px]:py-4 border-b border-zinc-800 bg-zinc-950">
       {/* USER */}
-      <div className="flex items-center gap-2 min-[500px]:gap-3">
+      <div  onClick={() => {
+          onClose?.();
+          goToProfile(post.user.id);
+        }}
+        className="flex items-center gap-2 min-[500px]:gap-3">
         {profileImg ? (
           <img src={profileImg} alt={username} className="w-8 h-8 min-[500px]:w-9 min-[500px]:h-9 min-[1000px]:w-10 min-[1000px]:h-10 rounded-full object-cover shrink-0" />
         ) : (

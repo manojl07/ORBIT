@@ -38,7 +38,9 @@ const AppRoutes = () => {
           </ProtectedRoute>
         }
       />
-      <Route path='/profile'
+
+      {/* Own profile */}
+      <Route path="/profile"
         element={
           <ProtectedRoute>
             <MainLayout>
@@ -47,6 +49,16 @@ const AppRoutes = () => {
           </ProtectedRoute>
         }
       />
+
+
+      {/* Other user profile */}
+      <Route path='/profile/:userId' element={
+        <ProtectedRoute>
+          <MainLayout>
+            <Profile />
+          </MainLayout>
+        </ProtectedRoute>
+      } />
     </Routes>
   )
 }
