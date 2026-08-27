@@ -3,7 +3,7 @@ const Post = require('../models/post.model')
 const ApiError = require('../utils/ApiError')
 
 
-const sanitizeUserProfile = (user, extras= {}) =>({
+const sanitizeUserProfile = (user, extras = {}) => ({
   id: user._id,
   username: user.username,
   bio: user.bio,
@@ -18,13 +18,13 @@ const sanitizeUserProfile = (user, extras= {}) =>({
 /* ----------------------------------------
    GET PUBLIC PROFILE
 -----------------------------------------*/
-const getUserProfile = async ({profileUserId, currentUserId}) => {
+const getUserProfile = async ({ profileUserId, currentUserId }) => {
   const [user, postsCount] = await Promise.all([
-    User.findById(profileUserId), 
-    Post.countDocuments({user: profileUserId})
+    User.findById(profileUserId),
+    Post.countDocuments({ user: profileUserId })
   ])
 
-  if(!user) throw new ApiError(404, "User not found");
+  if (!user) throw new ApiError(404, "User not found");
 
   return sanitizeUserProfile(user, {
     postsCount,
@@ -36,20 +36,24 @@ const getUserProfile = async ({profileUserId, currentUserId}) => {
 /* ----------------------------------------
    FOLLOW / UNFOLLOW
 -----------------------------------------*/
-const toggleFollow = async ({profileUserId, currentUserId}) => {
-  if(profileUserId === currentUserId) {
+const toggleFollow = async ({ profileUserId, currentUserId }) => {
+  if (String(profileUserId) === String(currentUserId)) {
     throw new ApiError(400, "You cannot follow yourself.")
   }
 
   const [currentUser, targetUser] = await Promise.all([User.findById(currentUserId), User.findById(profileUserId)])
 
-  if(!targetUser){
+  if (!currentUser) {
+    throw new ApiError(404, "Current user not found");
+  }
+
+  if (!targetUser) {
     throw new ApiError(404, "User not found");
   }
 
-  const alreadyFollowing = currentUser.following.some((id) => id.toString() === profileUserId)
+  const alreadyFollowing = currentUser.following.some((id) => String(id) === String(profileUserId))
 
-  if(alreadyFollowing){
+  if (alreadyFollowing) {
     currentUser.following.pull(profileUserId)
     targetUser.followers.pull(currentUserId)
   } else {
@@ -94,4 +98,64 @@ const searchUsers = async (query) => {
   }));
 };
 
-module.exports = {getUserProfile, toggleFollow, searchUsers}
+
+/* ----------------------------------------
+   FOLLOWERS
+-----------------------------------------*/
+const getFollowers = async ({ profileUserId, currentUserId }) => {
+  const user = await User.findById(profileUserId).populate("followers", "username profileImg followers")
+
+  if (!user) {
+    throw new ApiError(404, "User not found")
+  }
+
+  return user.followers.map((follower) => ({ id: follower._id, username: follower.username, profileImg: follower.profileImg, isFollowing: follower.followers.some((id) => String(id) === String(currentUserId)) }))
+}
+
+
+/* ----------------------------------------
+   FOLLOWING
+-----------------------------------------*/
+const getFollowing = async ({
+  profileUserId,
+  currentUserId,
+}) => {
+
+  console.log("========== GET FOLLOWING ==========");
+  console.log("profileUserId:", profileUserId);
+  console.log("currentUserId:", currentUserId);
+
+  const user = await User.findById(profileUserId)
+    .populate(
+      "following",
+      "username profileImg followers"
+    );
+
+  console.log("Found user:", user?._id);
+  console.log("Username:", user?.username);
+  console.log("Following IDs:", user?.following?.map(
+    (u) => String(u._id)
+  ));
+
+  if (!user) {
+    throw new ApiError(
+      404,
+      "User not found"
+    );
+  }
+
+  return user.following.map((following) => ({
+    id: following._id,
+    username: following.username,
+    profileImg: following.profileImg,
+
+    isFollowing: following.followers.some(
+      (id) =>
+        String(id) ===
+        String(currentUserId)
+    ),
+  }));
+};
+
+
+module.exports = { getUserProfile, toggleFollow, searchUsers, getFollowers, getFollowing }

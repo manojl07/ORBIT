@@ -21,14 +21,20 @@ const useFollow = (userId) => {
 
         return {
           ...old,
-          isFollowing: !following,
-          followersCount: following ? old.data.followersCount - 1 : old.data.followersCount + 1,
+          data: {
+            ...old.data,
+
+            isFollowing: !following,
+
+            followersCount: following ? Math.max(0, old.data.followersCount - 1) : old.data.followersCount + 1,
+          },
         }
       })
+      return {previous}
     },
 
-    onError: (_error,_variables,context) => {
-      if(context?.previous){
+    onError: (_error, _variables, context) => {
+      if (context?.previous) {
         queryClient.setQueriesData(["user-profile", userId], context.previous)
       }
       toast.error("Something went wrong")
@@ -39,9 +45,9 @@ const useFollow = (userId) => {
     },
 
     onSettled: () => {
-    queryClient.invalidateQueries({queryKey: ["user-profile", userId]})
-    queryClient.invalidateQueries({queryKey: ["feed"]})
-    queryClient.invalidateQueries({queryKey: ["user-posts"]})
+      queryClient.invalidateQueries({ queryKey: ["user-profile", userId] })
+      queryClient.invalidateQueries({ queryKey: ["feed"] })
+      queryClient.invalidateQueries({ queryKey: ["user-posts"] })
     }
   })
 }
