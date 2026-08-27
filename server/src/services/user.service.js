@@ -70,17 +70,28 @@ const toggleFollow = async ({profileUserId, currentUserId}) => {
    SEARCH USERS
 -----------------------------------------*/
 const searchUsers = async (query) => {
-  if(!query?.trim()) {
+
+  const trimmedQuery = query?.trim();
+
+  if (!trimmedQuery) {
     return [];
   }
 
-  const users = (await User.find({username: {$regex: query, $options: "i"}}).select("username profileImg").limit(10)).toSorted({username: 1})
+  const users = await User.find({
+    username: {
+      $regex: trimmedQuery,
+      $options: "i",
+    },
+  })
+    .select("username profileImg")
+    .sort({ username: 1 })
+    .limit(10);
 
   return users.map((user) => ({
     id: user._id,
-    uername: user.username,
+    username: user.username,
     profileImg: user.profileImg,
-  }))
-}
+  }));
+};
 
 module.exports = {getUserProfile, toggleFollow, searchUsers}

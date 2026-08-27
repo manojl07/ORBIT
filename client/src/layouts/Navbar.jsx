@@ -9,6 +9,7 @@ import {
 
 import { useAuth } from "../hooks/useAuth";
 import useLogout from "../hooks/useLogout";
+import SearchBar from "../components/search/SearchBar";
 
 const Navbar = ({ onOpenModal }) => {
   const { user } = useAuth();
@@ -114,7 +115,7 @@ const Navbar = ({ onOpenModal }) => {
 
             tracking-wide
 
-            bg-gradient-to-b
+            bg-linear-to-b
             from-white
             via-zinc-200
             to-zinc-500
@@ -132,6 +133,8 @@ const Navbar = ({ onOpenModal }) => {
         >
           Orbit
         </Link>
+
+        <SearchBar />
 
 
         {/* ========================================

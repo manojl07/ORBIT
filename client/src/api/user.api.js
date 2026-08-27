@@ -22,8 +22,12 @@ export const toggleFollow = async (userId) => {
    SEARCH USERS
 ---------------------------*/
 export const searchUsers = async (query) => {
-  const {data} = await API.get(`/users/search/${query}`)
+  const params = new URLSearchParams({
+    q: query,
+  });
+
+  const { data } = await API.get(`/users/search?${params}`);
 
   return data;
-}
+};
 
