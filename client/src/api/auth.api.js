@@ -19,7 +19,7 @@ export const getMe = async () => {
 }
 
 export const logoutUser = async () => {
-  const { data } = await API.post('auth/logout', { sessionId: null })
+  const {data} = await API.post('/auth/logout');
 
   return data;
 }

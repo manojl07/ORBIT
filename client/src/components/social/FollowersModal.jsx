@@ -10,6 +10,7 @@ import { backdropVariants, modalVariants } from '../../utils/animation';
 const FollowersModal = ({
   isOpen,
   onClose,
+  onNavigate,
   userId,
 }) => {
   const {
@@ -106,6 +107,7 @@ const FollowersModal = ({
                   <UserRow
                     key={user.id}
                     user={user}
+                    onNavigate={onNavigate}
                   />
                 ))}
             </div>

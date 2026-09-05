@@ -12,6 +12,7 @@ import {
 const FollowingModal = ({
   isOpen,
   onClose,
+  onNavigate,
   userId,
 }) => {
   const {
@@ -107,6 +108,7 @@ const FollowingModal = ({
                   <UserRow
                     key={user.id}
                     user={user}
+                    onNavigate={onNavigate}
                   />
                 ))}
             </div>

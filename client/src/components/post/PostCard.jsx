@@ -7,24 +7,27 @@ import { queryKeys } from "../../constants/queryKey";
 
 import useProfileNavigation from "../../hooks/useProfileNavigation";
 
+import { Link } from "react-router-dom";
+import { useAuth } from "../../hooks/useAuth";
+import FollowTextButton from "../social/FollowTextButton";
+
 const PostCard = ({ post }) => {
 
-  const goToProfile =
-    useProfileNavigation();
+const { user: currentUser } = useAuth();
 
-  const [isCommentOpen, setIsCommentOpen] =
-    useState(false);
+const goToProfile = useProfileNavigation();
 
-  const profileUserId =
-    post?.user?._id ??
-    post?.user?.id;
+const [isCommentOpen, setIsCommentOpen] = useState(false);
+
+const profileUserId = post?.user?._id ?? post?.user?.id;
+
+const currentUserId = currentUser?.id ?? currentUser?._id;
+
+const isOwnPost = String(currentUserId ?? "") === String(profileUserId ?? "");
 
   const handleProfileClick = () => {
     if (!profileUserId) {
-      console.error(
-        "PostCard: profile user ID missing",
-        post?.user
-      );
+      console.error("PostCard: profile user ID missing", post?.user);
       return;
     }
 
@@ -32,70 +35,33 @@ const PostCard = ({ post }) => {
   };
 
   return (
-    <div
-      className="
-        bg-zinc-950
-        border
-        border-zinc-800/70
-        rounded-2xl
-        overflow-hidden
-      "
-    >
+    <div className="bg-zinc-950 border border-zinc-800/70 rounded-2xl overflow-hidden">
+
 
       {/* Header */}
       <div className="flex items-center px-4 py-3">
 
+        {/* PROFILE NAVIGATION */}
         <div
           onClick={handleProfileClick}
-          className="
-            flex
-            items-center
-            gap-3
-            cursor-pointer
-            group
-          "
-        >
+          className="flex items-center gap-3 cursor-pointer group">
+          <img src={post.user?.profileImg} alt={post.user?.username || ""} className="w-8 h-8 rounded-full object-cover shrink-0" />
 
-          <img
-            src={post.user?.profileImg}
-            alt={
-              post.user?.username ||
-              ""
-            }
-            className="
-              w-9
-              h-9
-              rounded-full
-              object-cover
-              shrink-0
-            "
-          />
-
-          <p
-            className="
-              text-sm
-              font-semibold
-              text-white
-              group-hover:text-zinc-300
-              transition
-            "
-          >
-            {post.user?.username}
-          </p>
-
+          <h3 className="text-white text-sm font-semibold">{post.user?.username}</h3>
         </div>
+
+        {/* FOLLOW BUTTON */}
+        {!isOwnPost && (
+          <>
+            <span className="ml-2 mr-2 text-zinc-600">•</span>
+            <FollowTextButton user={post.user} />
+          </>
+        )}
 
       </div>
 
       {/* Image */}
-      <img
-        src={post.imageUrl}
-        alt="Post"
-        className="
-          w-full
-          aspect-[1.05/1]
-          object-cover
-          bg-zinc-900
+      <img src={post.imageUrl} alt="Post" className="w-full aspect-[1.05/1] object-cover bg-zinc-900
         "
       />
 

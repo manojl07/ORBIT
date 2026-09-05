@@ -108,7 +108,10 @@ const getFeed = async ({ page = 1, limit = 10, userId }) => {
 
   const [posts, total, userLikes] = await Promise.all([
     Post.find()
-      .populate("user", "username profileImg")
+      .populate(
+        "user",
+        "username profileImg followers"
+      )
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(limit)
@@ -116,18 +119,28 @@ const getFeed = async ({ page = 1, limit = 10, userId }) => {
 
     Post.countDocuments(),
 
+
     Like.find({ user: userId }).select("post")
   ])
 
   const likedPosts = new Set(userLikes.map(like => like.post.toString()))
 
-  const formattedPosts = posts.map(post => ({
+  const formattedPosts = posts.map((post) => ({
     ...post,
+
     isLiked: likedPosts.has(post._id.toString()),
-  }))
+
+    user: {
+      ...post.user,
+
+      isFollowing: post.user.followers.some(
+        (id) => id.toString() === userId
+      ),
+    },
+  }));
 
   return {
-    posts: formattedPosts,
+    posts: formattedPosts.map(sanitizePost),
     pagination: {
       page,
       limit,

@@ -10,7 +10,7 @@ const userProfileNavigation = () => {
   const goToProfile = (targetedUserId) => {
     if(!targetedUserId) return;
 
-    if(targetedUserId === user?.id){
+    if(String(targetedUserId) === String(user?.id)){
       navigate("/profile")
     } else {
       navigate(`/profile/${targetedUserId}`)

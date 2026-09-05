@@ -1,55 +1,67 @@
-import { useMutation, useQueryClient } from '@tanstack/react-query'
-import toast from 'react-hot-toast'
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import toast from "react-hot-toast";
 
-import { toggleFollow } from '../api/user.api'
+import { toggleFollow } from "../api/user.api";
 
-
-const useFollow = (userId) => {
+const useFollow = (user) => {
   const queryClient = useQueryClient();
 
-  return useMutation({
-    mutationFn: () => toggleFollow(userId),
-    onMutate: async () => {
-      await queryClient.cancelQueries({ queryKey: ["user-profile", userId] })
+  const userId = user?._id ?? user?.id;
 
-      const previous = queryClient.getQueryData(["user-profile", userId])
-
-      queryClient.setQueryData(["user-profile", userId], (old) => {
-        if (!old) return old;
-
-        const following = old.data.isFollowing;
-
-        return {
-          ...old,
-          data: {
-            ...old.data,
-
-            isFollowing: !following,
-
-            followersCount: following ? Math.max(0, old.data.followersCount - 1) : old.data.followersCount + 1,
-          },
-        }
-      })
-      return {previous}
-    },
-
-    onError: (_error, _variables, context) => {
-      if (context?.previous) {
-        queryClient.setQueriesData(["user-profile", userId], context.previous)
+  const mutation = useMutation({
+    mutationFn: () => {
+      if (!userId) {
+        throw new Error("User ID is missing");
       }
-      toast.error("Something went wrong")
+
+      return toggleFollow(userId);
     },
 
-    onSuccess: (Response) => {
-      toast.success(Response.message);
+    onSuccess: (response) => {
+      queryClient.invalidateQueries({
+        queryKey: ["user-profile", userId],
+      });
+
+      queryClient.invalidateQueries({
+        queryKey: ["followers", userId],
+      });
+
+      queryClient.invalidateQueries({
+        queryKey: ["following", userId],
+      });
+
+      queryClient.invalidateQueries({
+        queryKey: ["feed"],
+      });
+
+      queryClient.invalidateQueries({
+        queryKey: ["user-posts"],
+      });
+
+      toast.success(
+        response?.message ||
+          "Follow updated"
+      );
     },
 
-    onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: ["user-profile", userId] })
-      queryClient.invalidateQueries({ queryKey: ["feed"] })
-      queryClient.invalidateQueries({ queryKey: ["user-posts"] })
-    }
-  })
-}
+    onError: (error) => {
+      console.error(
+        "Follow toggle failed:",
+        error
+      );
 
-export default useFollow
+      toast.error(
+        error?.response?.data?.message ||
+          "Failed to update follow"
+      );
+    },
+  });
+
+  return {
+    toggleFollow: mutation.mutate,
+    isPending: mutation.isPending,
+    isFollowing: Boolean(user?.isFollowing),
+  };
+};
+
+export default useFollow;

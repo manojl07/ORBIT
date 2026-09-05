@@ -153,6 +153,7 @@ const Profile = () => {
 
         <ProfileHeader
           user={profileUser}
+          isOwnProfile={String(profileId) === String(user.id)}
           onEditProfile={() =>
             setIsEditOpen(true)
           }

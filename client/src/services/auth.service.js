@@ -1,6 +1,5 @@
-import API from "../api/axios"
-
 let logoutHandler = null;
+
 let isLoggingOut = false;
 
 export const registerLogoutHandler = (handler) => {
@@ -11,24 +10,16 @@ export const registerLogoutHandler = (handler) => {
   };
 };
 
-export const triggerLogout = async () => {
+export const triggerLogout = async (
+  options = {}
+) => {
   if (isLoggingOut) return;
 
   isLoggingOut = true;
 
   try {
-    await logoutHandler?.();
+    await logoutHandler?.(options);
   } finally {
     isLoggingOut = false;
   }
 };
-
-export const refreshAccessToken = async () => {
-  const {data} = await API.post('/auth/refresh');
-
-  return data;
-}
-
-export const logoutUser = async () => {
-  await API.post('/auth/logout');
-}
