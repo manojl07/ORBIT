@@ -51,7 +51,7 @@ const SearchBar = () => {
 
       <Search  size={18} className='text-zinc-500' />
 
-      <input value={query} onChange={(e) => setQuery(e.target.value)} className='bg-transparent outline-none flex-1 text-white' />
+      <input value={query} onChange={(e) => setQuery(e.target.value)} className='bg-transparent outline-none flex-1 text-white' placeholder='search username...' />
 
       </div>
 
