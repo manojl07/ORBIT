@@ -1,5 +1,4 @@
-import React, { useState } from "react";
-
+import { useRef, useState } from "react";
 import PostActions from "./PostActions";
 import CommentModal from "../comment/CommentModal";
 
@@ -13,6 +12,9 @@ import FollowTextButton from "../social/FollowTextButton";
 
 import PostMenu from "./PostMenu";
 import DeletePostDialog from "./DeletePostDialog";
+import { Heart } from "lucide-react";
+import { motion } from "framer-motion";
+import useLikePost from "../../hooks/useLikePost";
 
 const PostCard = ({ post }) => {
 
@@ -23,6 +25,12 @@ const PostCard = ({ post }) => {
   const [isCommentOpen, setIsCommentOpen] = useState(false);
 
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+
+  const [showHeart, setShowHeart] = useState(false)
+
+  const lastTapRef = useRef(0)
+
+  const { toggleLike, isPending: isLikePending } = useLikePost({ post, queryKey: queryKeys.feed })
 
   const profileUserId = post?.user?._id ?? post?.user?.id;
 
@@ -38,6 +46,21 @@ const PostCard = ({ post }) => {
 
     goToProfile(profileUserId);
   };
+
+  const handleDoubleTap = (event) => {
+    const now = Date.now();
+
+    if (now - lastTapRef.current < 300) {
+      lastTapRef.current = 0;
+
+      if (isLikePending) return;
+
+      setShowHeart(true);
+      toggleLike();
+    } else {
+      lastTapRef.current = now;
+    }
+  }
 
   return (
     <div className="bg-zinc-950 border border-zinc-800/70 rounded-2xl overflow-hidden">
@@ -77,9 +100,16 @@ const PostCard = ({ post }) => {
       </div>
 
       {/* Image */}
-      <img src={post.imageUrl} alt="Post" className="w-full aspect-[1.05/1] object-cover bg-zinc-900
-        "
-      />
+      <div className="relative" onPointerUp={handleDoubleTap} >
+        <img src={post.imageUrl} alt="Post" draggable={false} className="w-full aspect-[1.05/1] object-cover bg-zinc-900 touch-manipulation select-none" />
+
+        {showHeart && (
+          <motion.div initial={{scale: 0,opacity: 0,}} animate={{scale: [0, 1.25, 1],opacity: [0, 1, 0],}} transition={{duration: 0.7,ease: "easeOut",}}
+            onAnimationComplete={() => setShowHeart(false)} className="absolute inset-0 flex items-center justify-center pointer-events-none" >
+            <Heart size={110} className="fill-red-500 text-red-500" />
+          </motion.div>
+        )}
+      </div>
 
       {/* Content */}
       <div className="px-4 py-3">
