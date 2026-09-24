@@ -16,17 +16,19 @@ import DeletePostDialog from "./DeletePostDialog";
 
 const PostCard = ({ post }) => {
 
-const { user: currentUser } = useAuth();
+  const { user: currentUser } = useAuth();
 
-const goToProfile = useProfileNavigation();
+  const goToProfile = useProfileNavigation();
 
-const [isCommentOpen, setIsCommentOpen] = useState(false);
+  const [isCommentOpen, setIsCommentOpen] = useState(false);
 
-const profileUserId = post?.user?._id ?? post?.user?.id;
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
 
-const currentUserId = currentUser?.id ?? currentUser?._id;
+  const profileUserId = post?.user?._id ?? post?.user?.id;
 
-const isOwnPost = String(currentUserId ?? "") === String(profileUserId ?? "");
+  const currentUserId = currentUser?.id ?? currentUser?._id;
+
+  const isOwnPost = String(currentUserId ?? "") === String(profileUserId ?? "");
 
   const handleProfileClick = () => {
     if (!profileUserId) {
@@ -60,6 +62,17 @@ const isOwnPost = String(currentUserId ?? "") === String(profileUserId ?? "");
             <FollowTextButton user={post.user} />
           </>
         )}
+        <PostMenu
+          post={post}
+          onDeleteClick={() => setShowDeleteDialog(true)}
+        />
+
+        <DeletePostDialog
+          isOpen={showDeleteDialog}
+          post={post}
+          onClose={() => setShowDeleteDialog(false)}
+          onDeleted={() => setShowDeleteDialog(false)}
+        />
 
       </div>
 

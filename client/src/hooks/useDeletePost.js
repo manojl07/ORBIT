@@ -1,5 +1,10 @@
-import {useMutation,useQueryClient,} from "@tanstack/react-query";
+import {
+  useMutation,
+  useQueryClient,
+} from "@tanstack/react-query";
+
 import toast from "react-hot-toast";
+
 import { deletePost } from "../api/post.api";
 import { queryKeys } from "../constants/queryKey";
 
@@ -10,91 +15,186 @@ const getPostId = (post) => {
 
 
 const removePostFromCache = (oldData, postId) => {
-  if (!oldData?.data?.posts) {
+  if (!oldData?.pages) {
     return oldData;
   }
 
-  const filteredPosts = oldData.data.posts.filter((post) => getPostId(post) !== postId);
-
   return {
     ...oldData,
-    data: {
-      ...oldData.data,
-      posts: filteredPosts,
-      ...(oldData.data.pagination && {
-        pagination: {
-          ...oldData.data.pagination,
-          total: Math.max(0, (oldData.data.pagination.total ?? 1) - 1),
+
+    pages: oldData.pages.map((page) => {
+      if (!page?.data?.posts) {
+        return page;
+      }
+
+      return {
+        ...page,
+
+        data: {
+          ...page.data,
+
+          posts: page.data.posts.filter(
+            (post) => getPostId(post) !== postId
+          ),
         },
-      }),
-    },
+      };
+    }),
   };
 };
 
 
-const useDeletePost = ({ post, onSuccess, }) => {
+const useDeletePost = ({ post, onSuccess }) => {
+
   const queryClient = useQueryClient();
+
   const postId = getPostId(post);
-  const userId = String(post?.user?._id ?? post?.user?.id ?? "");
+
+  const userId = String(
+    post?.user?._id ??
+    post?.user?.id ??
+    ""
+  );
+
+  const userPostsKey = userId
+    ? queryKeys.userPosts(userId)
+    : null;
+
 
   const mutation = useMutation({
+
     mutationFn: () => deletePost(postId),
-    // ==========================================
-    // OPTIMISTIC DELETE
-    // ==========================================
+
+
+    // ================================
+    // BEFORE DELETE
+    // ================================
     onMutate: async () => {
-      await Promise.all([
-        queryClient.cancelQueries({ queryKey: queryKeys.feed, }),
-        queryClient.cancelQueries({ queryKey: ["user-posts"], }),
-      ]);
 
-      // Save existing cache
-      const previousFeed = queryClient.getQueryData(["feed"]);
-      const userPostsKey = ["user-posts", userId,];
-      const previousUserPosts = queryClient.getQueryData(userPostsKey);
+      const cancelPromises = [
+        queryClient.cancelQueries({
+          queryKey: queryKeys.feed,
+        }),
+      ];
 
-      // Remove immediately from feed
-      queryClient.setQueryData(queryKeys.feed, (oldData) => removePostFromCache(oldData, postId));
-      // Remove immediately from profile
-      if (userId) {
-        queryClient.setQueryData(userPostsKey, (oldData) => removePostFromCache(oldData, postId));
+      if (userPostsKey) {
+        cancelPromises.push(
+          queryClient.cancelQueries({
+            queryKey: userPostsKey,
+          })
+        );
       }
 
-      return { previousFeed, previousUserPosts, userPostsKey, };
+      await Promise.all(cancelPromises);
+
+
+      // Save current cache
+      const previousFeed =
+        queryClient.getQueryData(queryKeys.feed);
+
+      const previousUserPosts =
+        userPostsKey
+          ? queryClient.getQueryData(userPostsKey)
+          : undefined;
+
+
+      // Remove immediately from feed
+      queryClient.setQueryData(
+        queryKeys.feed,
+        (oldData) =>
+          removePostFromCache(oldData, postId)
+      );
+
+
+      // Remove immediately from profile
+      if (userPostsKey) {
+        queryClient.setQueryData(
+          userPostsKey,
+          (oldData) =>
+            removePostFromCache(oldData, postId)
+        );
+      }
+
+
+      // Save backup for rollback
+      return {
+        previousFeed,
+        previousUserPosts,
+        userPostsKey,
+      };
     },
 
-    // ==========================================
-    // ERROR → ROLLBACK
-    // ==========================================
-    onError: (error, variables, context) => {
+
+    // ================================
+    // DELETE FAILED
+    // ================================
+    onError: (error, _variables, context) => {
+
       if (!context) {
         return;
       }
 
-      queryClient.setQueryData(queryKeys.feed, context.previousFeed);
-      if (context.userPostsKey) {
-        queryClient.setQueryData(context.userPostsKey, context.previousUserPosts);
+
+      if (context.previousFeed !== undefined) {
+        queryClient.setQueryData(
+          queryKeys.feed,
+          context.previousFeed
+        );
       }
 
-      toast.error(error?.response?.data?.message || "Failed to delete post");
+
+      if (
+        context.userPostsKey &&
+        context.previousUserPosts !== undefined
+      ) {
+        queryClient.setQueryData(
+          context.userPostsKey,
+          context.previousUserPosts
+        );
+      }
+
+
+      toast.error(
+        error?.response?.data?.message ||
+        "Failed to delete post"
+      );
     },
 
-    // ==========================================
-    // SUCCESS
-    // ==========================================
-    onSuccess: () => { toast.success("Post deleted successfully"); onSuccess?.(); },
 
-    // ==========================================
-    // SERVER SYNC
-    // ==========================================
+    // ================================
+    // DELETE SUCCESSFUL
+    // ================================
+    onSuccess: () => {
+
+      toast.success(
+        "Post deleted successfully"
+      );
+
+      onSuccess?.();
+    },
+
+
+    // ================================
+    // ALWAYS SYNC WITH SERVER
+    // ================================
     onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.feed, });
-      queryClient.invalidateQueries({ queryKey: ["user-posts"], });
+
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.feed,
+      });
+
+      if (userPostsKey) {
+        queryClient.invalidateQueries({
+          queryKey: userPostsKey,
+        });
+      }
     },
   });
 
 
-  return { deletePost: mutation.mutate, isDeleting: mutation.isPending, };
+  return {
+    deletePost: mutation.mutate,
+    isDeleting: mutation.isPending,
+  };
 };
 
 

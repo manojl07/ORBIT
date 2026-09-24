@@ -25,7 +25,7 @@ const PostMenu = ({post, onDeleteClick}) => {
 
       <button type='button' 
       onClick={(e) => {
-      e.stopPropogation();
+      e.stopPropagation();
       setShowMenu((prev) => !prev);}}
       className='flex items-center justify-center w-9 h-9 rounded-full text-zinc-400 hover:text-white hover:bg-zinc-800 transition' aria-label='Post options'
       ><MoreHorizontal size={21} /></button>
