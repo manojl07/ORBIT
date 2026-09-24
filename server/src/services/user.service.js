@@ -116,46 +116,23 @@ const getFollowers = async ({ profileUserId, currentUserId }) => {
 /* ----------------------------------------
    FOLLOWING
 -----------------------------------------*/
-const getFollowing = async ({
-  profileUserId,
-  currentUserId,
-}) => {
-
-  console.log("========== GET FOLLOWING ==========");
-  console.log("profileUserId:", profileUserId);
-  console.log("currentUserId:", currentUserId);
-
-  const user = await User.findById(profileUserId)
-    .populate(
-      "following",
-      "username profileImg followers"
-    );
-
-  console.log("Found user:", user?._id);
-  console.log("Username:", user?.username);
-  console.log("Following IDs:", user?.following?.map(
-    (u) => String(u._id)
-  ));
+const getFollowing = async ({profileUserId, currentUserId,}) => {
+  const user = await User.findById(profileUserId).populate("following", "username profileImg followers");
 
   if (!user) {
-    throw new ApiError(
-      404,
-      "User not found"
-    );
+    throw new ApiError(404, "User not found");
   }
 
   return user.following.map((following) => ({
     id: following._id,
     username: following.username,
     profileImg: following.profileImg,
-
-    isFollowing: following.followers.some(
-      (id) =>
-        String(id) ===
-        String(currentUserId)
-    ),
+    isFollowing: following.followers.some((id) => String(id) === String(currentUserId)),
   }));
 };
 
 
 module.exports = { getUserProfile, toggleFollow, searchUsers, getFollowers, getFollowing }
+
+
+

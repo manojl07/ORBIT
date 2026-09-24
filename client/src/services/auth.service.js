@@ -10,9 +10,7 @@ export const registerLogoutHandler = (handler) => {
   };
 };
 
-export const triggerLogout = async (
-  options = {}
-) => {
+export const triggerLogout = async (options = {}) => {
   if (isLoggingOut) return;
 
   isLoggingOut = true;

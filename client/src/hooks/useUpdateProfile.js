@@ -5,15 +5,10 @@ import { queryKeys } from "../constants/queryKey";
 import toast from "react-hot-toast";
 
 
-
-
-
-
-
 const useUpdateProfile = (onSuccessCallback) => {
   const queryClient = useQueryClient();
 
-  const { user, setUser } = useAuth();
+  const { setUser } = useAuth();
 
   return useMutation({
     mutationFn: updateProfile,

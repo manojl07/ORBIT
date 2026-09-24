@@ -26,22 +26,10 @@ const FollowingModal = ({
   return (
     <AnimatePresence>
       {isOpen && (
-        <motion.div
-          variants={backdropVariants}
-          initial="hidden"
-          animate="visible"
-          exit="exit"
-          onClick={onClose}
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm"
-        >
-          <motion.div
-            variants={modalVariants}
-            initial="hidden"
-            animate="visible"
-            exit="exit"
-            onClick={(e) => e.stopPropagation()}
-            className="w-full max-w-md rounded-2xl bg-zinc-950 border border-zinc-800 overflow-hidden"
-          >
+        <motion.div variants={backdropVariants} initial="hidden" animate="visible" exit="exit" onClick={onClose} className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm" >
+          <motion.div variants={modalVariants} initial="hidden" animate="visible" exit="exit" onClick={(e) => e.stopPropagation()}
+            className="w-full max-w-md rounded-2xl bg-zinc-950 border border-zinc-800 overflow-hidden" >
+
             {/* Header */}
             <div className="flex items-center justify-between border-b border-zinc-800 px-5 py-4">
               <h2 className="text-lg font-semibold text-white">
@@ -109,6 +97,7 @@ const FollowingModal = ({
                     key={user.id}
                     user={user}
                     onNavigate={onNavigate}
+                    profileUserId={userId}
                   />
                 ))}
             </div>

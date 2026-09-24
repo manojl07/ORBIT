@@ -13,52 +13,13 @@ import MainLayout from '../layouts/MainLayout'
 const AppRoutes = () => {
   return (
     <Routes>
-      <Route
-        path='/login'
-        element={
-          <PublicRoute>
-            <Login />
-          </PublicRoute>
-        } />
-
-      <Route
-        path='/register'
-        element={
-          <PublicRoute>
-            <Register />
-          </PublicRoute>
-        }
-      />
-      <Route path='/'
-        element={
-          <ProtectedRoute>
-            <MainLayout>
-              <Feed />
-            </MainLayout>
-          </ProtectedRoute>
-        }
-      />
-
+      <Route path='/login' element={<PublicRoute> <Login /> </PublicRoute>} />
+      <Route path='/register' element={<PublicRoute> <Register /> </PublicRoute>} />
+      <Route path='/' element={<ProtectedRoute> <MainLayout> <Feed /> </MainLayout> </ProtectedRoute>} />
       {/* Own profile */}
-      <Route path="/profile"
-        element={
-          <ProtectedRoute>
-            <MainLayout>
-              <Profile />
-            </MainLayout>
-          </ProtectedRoute>
-        }
-      />
-
-
+      <Route path="/profile" element={<ProtectedRoute> <MainLayout> <Profile /> </MainLayout> </ProtectedRoute>} />
       {/* Other user profile */}
-      <Route path='/profile/:userId' element={
-        <ProtectedRoute>
-          <MainLayout>
-            <Profile />
-          </MainLayout>
-        </ProtectedRoute>
-      } />
+      <Route path='/profile/:userId' element={<ProtectedRoute> <MainLayout> <Profile /> </MainLayout> </ProtectedRoute>} />
     </Routes>
   )
 }

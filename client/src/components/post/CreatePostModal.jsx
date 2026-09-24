@@ -8,10 +8,7 @@ import { queryKeys } from "../../constants/queryKey";
 import { useAuth } from "../../hooks/useAuth";
 
 import { createPost } from "../../api/post.api";
-import {
-  backdropVariants,
-  modalVariants,
-} from "../../constants/animation";
+import {backdropVariants, modalVariants,} from "../../constants/animation";
 
 const CreatePostModal = ({ isOpen, onClose }) => {
   const queryClient = useQueryClient();
@@ -37,10 +34,7 @@ const CreatePostModal = ({ isOpen, onClose }) => {
 
     return () => {
       document.body.style.overflow = "auto";
-      window.removeEventListener(
-        "keydown",
-        handleKeyDown
-      );
+      window.removeEventListener("keydown", handleKeyDown);
     };
   }, [isOpen, onClose]);
 
@@ -144,59 +138,35 @@ const CreatePostModal = ({ isOpen, onClose }) => {
                   <motion.label
                     whileHover={{ scale: 1.01 }}
                     whileTap={{ scale: 0.99 }}
-                    className="relative flex h-[420px] cursor-pointer items-center justify-center overflow-hidden rounded-2xl border border-zinc-800 bg-black transition hover:border-blue-500" >
+                    className="relative flex h-105 cursor-pointer items-center justify-center overflow-hidden rounded-2xl border border-zinc-800 bg-black transition hover:border-blue-500" >
 
                     {preview ? (
-                      <img
-                        src={preview}
-                        alt="Preview"
-                        className="
-              h-full
-              w-full
-              object-contain
-            "
-                      />
+                      <img src={preview} alt="Preview" className=" h-full w-full object-contain " />
                     ) : (
                       <div className="flex flex-col items-center">
 
-                        <div
-                          className="flex h-16 w-16 items-center justify-center rounded-full bg-zinc-800" >
-                          <ImagePlus
-                            size={32}
-                            className="text-zinc-400"
-                          />
+                        <div className="flex h-16 w-16 items-center justify-center rounded-full bg-zinc-800" >
+                          <ImagePlus size={32} className="text-zinc-400" />
                         </div>
 
-                        <p className="mt-5 text-lg font-semibold text-white">
-                          Select a photo
-                        </p>
-
-                        <p className="mt-1 text-sm text-zinc-500">
-                          Drag or click to upload
-                        </p>
+                        <p className="mt-5 text-lg font-semibold text-white">Select a photo</p>
+                        <p className="mt-1 text-sm text-zinc-500">Drag or click to upload</p>
 
                       </div>
                     )}
 
-                    <input
-                      hidden
-                      type="file"
-                      accept="image/*"
-                      onChange={handleImage}
-                    />
+                    <input hidden type="file" accept="image/*" onChange={handleImage} />
                   </motion.label>
 
                   {image && (
-                    <p className="mt-3 truncate text-center text-sm text-zinc-500">
-                      📷 {image.name}
-                    </p>
+                    <p className="mt-3 truncate text-center text-sm text-zinc-500">📷 {image.name}</p>
                   )}
 
                 </div>
 
                 {/* RIGHT SIDE */}
 
-                <div className="flex h-[420px] flex-col overflow-hidden rounded-2xl border border-zinc-800  bg-zinc-950" >
+                <div className="flex h-105 flex-col overflow-hidden rounded-2xl border border-zinc-800  bg-zinc-950" >
 
                   {/* USER */}
 

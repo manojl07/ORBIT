@@ -108,6 +108,7 @@ const FollowersModal = ({
                     key={user.id}
                     user={user}
                     onNavigate={onNavigate}
+                    profileUserId={userId}
                   />
                 ))}
             </div>

@@ -1,5 +1,6 @@
 import { Navigate } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth"
+import Loader from "../components/ui/Loader";
 
 
 const PublicRoute = ({ children }) => {
@@ -8,7 +9,7 @@ const PublicRoute = ({ children }) => {
 
   if (isAuthLoading) {
     return (
-      <div>Loading...</div>
+      <Loader />
     )
   }
 

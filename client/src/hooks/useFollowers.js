@@ -6,6 +6,7 @@ const useFollowers = (userId, enabled = true) => {
   return useQuery({
     queryKey: ["followers", userId],
     queryFn: () => getFollowers(userId),
+    enabled: enabled && !!userId,
     staleTime: 1000 * 60 * 5,
   })
 }

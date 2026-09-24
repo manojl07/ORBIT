@@ -11,6 +11,9 @@ import { Link } from "react-router-dom";
 import { useAuth } from "../../hooks/useAuth";
 import FollowTextButton from "../social/FollowTextButton";
 
+import PostMenu from "./PostMenu";
+import DeletePostDialog from "./DeletePostDialog";
+
 const PostCard = ({ post }) => {
 
 const { user: currentUser } = useAuth();

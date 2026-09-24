@@ -28,7 +28,7 @@ const AuthInitializer = ({ children }) => {
         if (error?.response?.status === 401) {
           setUser(null);
         } else {
-          toast.error("Auth Initailization failed: error");
+          toast.error(`Auth Initialization failed: ${error.message}`);
           setUser(null)
         }
       } finally {

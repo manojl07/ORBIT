@@ -10,12 +10,7 @@ const { createPostSchema } = require('../validators/post.validator')
 const { createPostController, deletePostController, getUserPostsController, getFeedController, toggleLikeController } = require("../controllers/post.controller");
 const { createCommentController, getCommentsController } = require('../controllers/comment.controller');
 
-router.post('/',
-  authMiddleware,
-  upload.single('image'),
-  validate(createPostSchema),
-  createPostController
-)
+router.post('/', authMiddleware, upload.single('image'), validate(createPostSchema), createPostController)
 
 router.delete('/:id', authMiddleware, deletePostController);
 

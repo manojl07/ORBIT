@@ -3,31 +3,31 @@ import toast from "react-hot-toast";
 
 import { toggleFollow } from "../api/user.api";
 
-const useFollow = (user) => {
+const useFollow = (user, profileUserId) => {
   const queryClient = useQueryClient();
 
-  const userId = user?._id ?? user?.id;
+  const targetUserId = user?._id ?? user?.id;
 
   const mutation = useMutation({
     mutationFn: () => {
-      if (!userId) {
+      if (!targetUserId) {
         throw new Error("User ID is missing");
       }
 
-      return toggleFollow(userId);
+      return toggleFollow(targetUserId);
     },
 
     onSuccess: (response) => {
       queryClient.invalidateQueries({
-        queryKey: ["user-profile", userId],
+        queryKey: ["user-profile", targetUserId],
       });
 
       queryClient.invalidateQueries({
-        queryKey: ["followers", userId],
+        queryKey: ["followers", profileUserId],
       });
 
       queryClient.invalidateQueries({
-        queryKey: ["following", userId],
+        queryKey: ["following", profileUserId],
       });
 
       queryClient.invalidateQueries({
@@ -38,22 +38,12 @@ const useFollow = (user) => {
         queryKey: ["user-posts"],
       });
 
-      toast.success(
-        response?.message ||
-          "Follow updated"
-      );
+      toast.success(response?.message || "Follow updated");
     },
 
     onError: (error) => {
-      console.error(
-        "Follow toggle failed:",
-        error
-      );
-
-      toast.error(
-        error?.response?.data?.message ||
-          "Failed to update follow"
-      );
+      console.error("Follow toggle failed:", error);
+      toast.error(error?.response?.data?.message || "Failed to update follow");
     },
   });
 

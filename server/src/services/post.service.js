@@ -6,7 +6,6 @@ const { uploadImage, deleteImage } = require("./image.service")
 const Like = require('../models/like.model')
 
 
-
 const sanitizePost = (post) => ({
   id: post._id,
   _id: post._id,
@@ -19,7 +18,6 @@ const sanitizePost = (post) => ({
   user: post.user,
   createdAt: post.createdAt,
 });
-
 
 const createPost = async ({ caption, image, userId }) => {
   if (!image) {

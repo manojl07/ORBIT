@@ -2,7 +2,7 @@ import { Link } from "react-router-dom";
 import { Loader2 } from "lucide-react";
 import FollowTextButton from "./FollowTextButton";
 
-const UserRow = ({ user, onNavigate }) => {
+const UserRow = ({ user, onNavigate, profileUserId }) => {
 
   const handleProfileClick = () => {
     onNavigate?.();
@@ -26,7 +26,7 @@ const UserRow = ({ user, onNavigate }) => {
 
       </Link>
 
-      <FollowTextButton user={user} />
+      <FollowTextButton user={user} profileUserId={profileUserId} />
 
     </div>
   )

@@ -5,7 +5,6 @@ const authMiddleware = require('../middlewares/auth.middleware')
 const {getUserProfileController, toggleFollowController, searchUsersController, getFollowersController, getFollowingController} = require('../controllers/user.controller')
 
 
-
 router.get('/search', authMiddleware, searchUsersController);
 
 router.get('/:userId/followers', authMiddleware, getFollowersController)
