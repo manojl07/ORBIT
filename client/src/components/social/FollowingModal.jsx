@@ -32,14 +32,9 @@ const FollowingModal = ({
 
             {/* Header */}
             <div className="flex items-center justify-between border-b border-zinc-800 px-5 py-4">
-              <h2 className="text-lg font-semibold text-white">
-                Following
-              </h2>
+              <h2 className="text-lg font-semibold text-white">Following</h2>
 
-              <button
-                onClick={onClose}
-                className="text-zinc-400 hover:text-white transition"
-              >
+              <button onClick={onClose} className="text-zinc-400 hover:text-white transition" >
                 <X size={20} />
               </button>
             </div>
@@ -49,10 +44,7 @@ const FollowingModal = ({
               {isLoading && (
                 <div className="space-y-4 p-4">
                   {Array.from({ length: 6 }).map((_, index) => (
-                    <div
-                      key={index}
-                      className="animate-pulse flex items-center gap-3"
-                    >
+                    <div key={index} className="animate-pulse flex items-center gap-3" >
                       <div className="w-12 h-12 rounded-full bg-zinc-800" />
 
                       <div className="flex-1">
@@ -66,40 +58,22 @@ const FollowingModal = ({
               )}
 
               {isError && (
-                <div className="py-16 text-center text-red-500">
-                  Failed to load following.
+                <div className="py-16 text-center text-red-500">Failed to load following.</div>
+              )}
+
+              {!isLoading && !isError && following.length === 0 && (
+                <div className="flex flex-col items-center justify-center py-16">
+                  <Users size={44} className="text-zinc-700" />
+
+                  <h3 className="mt-4 text-lg font-semibold text-white">Not Following Anyone</h3>
+
+                  <p className="mt-2 text-sm text-zinc-500 text-center px-8">Accounts you follow will appear here.</p>
                 </div>
               )}
 
-              {!isLoading &&
-                !isError &&
-                following.length === 0 && (
-                  <div className="flex flex-col items-center justify-center py-16">
-                    <Users
-                      size={44}
-                      className="text-zinc-700"
-                    />
-
-                    <h3 className="mt-4 text-lg font-semibold text-white">
-                      Not Following Anyone
-                    </h3>
-
-                    <p className="mt-2 text-sm text-zinc-500 text-center px-8">
-                      Accounts you follow will appear here.
-                    </p>
-                  </div>
-                )}
-
-              {!isLoading &&
-                !isError &&
-                following.map((user) => (
-                  <UserRow
-                    key={user.id}
-                    user={user}
-                    onNavigate={onNavigate}
-                    profileUserId={userId}
-                  />
-                ))}
+              {!isLoading && !isError && following.map((user) => (
+                <UserRow key={user.id} user={user} onNavigate={onNavigate} profileUserId={userId} />
+              ))}
             </div>
           </motion.div>
         </motion.div>

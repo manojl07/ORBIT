@@ -65,16 +65,12 @@ const PostCard = ({ post }) => {
   return (
     <div className="bg-zinc-950 border border-zinc-800/70 rounded-2xl overflow-hidden">
 
-
       {/* Header */}
       <div className="flex items-center px-4 py-3">
 
         {/* PROFILE NAVIGATION */}
-        <div
-          onClick={handleProfileClick}
-          className="flex items-center gap-3 cursor-pointer group">
+        <div onClick={handleProfileClick} className="flex items-center gap-3 cursor-pointer group">
           <img src={post.user?.profileImg} alt={post.user?.username || ""} className="w-8 h-8 rounded-full object-cover shrink-0" />
-
           <h3 className="text-white text-sm font-semibold">{post.user?.username}</h3>
         </div>
 
@@ -85,17 +81,10 @@ const PostCard = ({ post }) => {
             <FollowTextButton user={post.user} />
           </>
         )}
-        <PostMenu
-          post={post}
-          onDeleteClick={() => setShowDeleteDialog(true)}
-        />
+        <PostMenu post={post} onDeleteClick={() => setShowDeleteDialog(true)} />
 
-        <DeletePostDialog
-          isOpen={showDeleteDialog}
-          post={post}
-          onClose={() => setShowDeleteDialog(false)}
-          onDeleted={() => setShowDeleteDialog(false)}
-        />
+        <DeletePostDialog isOpen={showDeleteDialog} post={post} onClose={() => setShowDeleteDialog(false)}
+          onDeleted={() => setShowDeleteDialog(false)} />
 
       </div>
 
@@ -114,29 +103,13 @@ const PostCard = ({ post }) => {
       {/* Content */}
       <div className="px-4 py-3">
 
-        <PostActions
-          post={post}
-          queryKey={queryKeys.feed}
-          onCommentClick={() =>
-            setIsCommentOpen(true)
-          }
-        />
+        <PostActions post={post} queryKey={queryKeys.feed} onCommentClick={() => setIsCommentOpen(true)} />
 
         {/* Caption */}
         {post.caption && (
           <p className="mt-3 text-sm text-zinc-300">
 
-            <span
-              onClick={handleProfileClick}
-              className="
-                font-semibold
-                text-white
-                mr-2
-                cursor-pointer
-                hover:text-zinc-300
-                transition
-              "
-            >
+            <span onClick={handleProfileClick} className="font-semibold text-white mr-2 cursor-pointer hover:text-zinc-300 transition" >
               {post.user?.username}
             </span>
 
@@ -147,55 +120,20 @@ const PostCard = ({ post }) => {
 
         {/* View comments */}
         {post.commentsCount > 0 && (
-          <button
-            type="button"
-            onClick={() =>
-              setIsCommentOpen(true)
-            }
-            className="
-              mt-2
-              text-sm
-              text-zinc-500
-              hover:text-zinc-300
-              transition
-            "
-          >
-            View all{" "}
-            {post.commentsCount} comments
+          <button type="button" onClick={() => setIsCommentOpen(true)}
+            className="mt-2 text-sm text-zinc-500 hover:text-zinc-300 transition" >
+            View all{" "}{post.commentsCount} comments
           </button>
         )}
 
         {/* Date */}
-        <p
-          className="
-            mt-2
-            text-[10px]
-            tracking-widest
-            text-zinc-600
-            uppercase
-          "
-        >
-          {new Date(
-            post.createdAt
-          ).toLocaleDateString(
-            "en-US",
-            {
-              month: "short",
-              day: "numeric",
-              year: "numeric",
-            }
-          )}
+        <p className="mt-2 text-[10px] tracking-widest text-zinc-600 uppercase" >
+          {new Date(post.createdAt).toLocaleDateString("en-US",{month: "short",day: "numeric",year: "numeric",})}
         </p>
 
       </div>
 
-      <CommentModal
-        isOpen={isCommentOpen}
-        onClose={() =>
-          setIsCommentOpen(false)
-        }
-        post={post}
-      />
+      <CommentModal isOpen={isCommentOpen} onClose={() => setIsCommentOpen(false)}post={post} />
 
     </div>
   );

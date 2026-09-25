@@ -7,49 +7,23 @@ import UserRow from "./UserRow";
 
 import { backdropVariants, modalVariants } from '../../utils/animation';
 
-const FollowersModal = ({
-  isOpen,
-  onClose,
-  onNavigate,
-  userId,
-}) => {
-  const {
-    data,
-    isLoading,
-    isError,
-  } = useFollowers(userId, isOpen);
+const FollowersModal = ({ isOpen, onClose, onNavigate, userId, }) => {
+  const { data, isLoading, isError, } = useFollowers(userId, isOpen);
 
   const followers = data?.data || [];
 
   return (
     <AnimatePresence>
       {isOpen && (
-        <motion.div
-          variants={backdropVariants}
-          initial="hidden"
-          animate="visible"
-          exit="exit"
-          onClick={onClose}
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm"
-        >
-          <motion.div
-            variants={modalVariants}
-            initial="hidden"
-            animate="visible"
-            exit="exit"
-            onClick={(e) => e.stopPropagation()}
-            className="w-full max-w-md rounded-2xl bg-zinc-950 border border-zinc-800 overflow-hidden"
-          >
+        <motion.div variants={backdropVariants} initial="hidden" animate="visible" exit="exit" onClick={onClose}
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm" >
+          <motion.div variants={modalVariants} initial="hidden" animate="visible" exit="exit" onClick={(e) => e.stopPropagation()}
+            className="w-full max-w-md rounded-2xl bg-zinc-950 border border-zinc-800 overflow-hidden" >
             {/* Header */}
             <div className="flex items-center justify-between border-b border-zinc-800 px-5 py-4">
-              <h2 className="text-lg font-semibold text-white">
-                Followers
-              </h2>
+              <h2 className="text-lg font-semibold text-white">Followers</h2>
 
-              <button
-                onClick={onClose}
-                className="text-zinc-400 hover:text-white transition"
-              >
+              <button onClick={onClose} className="text-zinc-400 hover:text-white transition">
                 <X size={20} />
               </button>
             </div>
@@ -59,10 +33,7 @@ const FollowersModal = ({
               {isLoading && (
                 <div className="space-y-4 p-4">
                   {Array.from({ length: 6 }).map((_, index) => (
-                    <div
-                      key={index}
-                      className="animate-pulse flex items-center gap-3"
-                    >
+                    <div key={index} className="animate-pulse flex items-center gap-3" >
                       <div className="w-12 h-12 rounded-full bg-zinc-800" />
 
                       <div className="flex-1">
@@ -76,41 +47,22 @@ const FollowersModal = ({
               )}
 
               {isError && (
-                <div className="py-16 text-center text-red-500">
-                  Failed to load followers.
+                <div className="py-16 text-center text-red-500">Failed to load followers.</div>
+              )}
+
+              {!isLoading && !isError && followers.length === 0 && (
+                <div className="flex flex-col items-center justify-center py-16">
+                  <Users size={44} className="text-zinc-700" />
+
+                  <h3 className="mt-4 text-lg font-semibold text-white">No Followers Yet</h3>
+
+                  <p className="mt-2 text-sm text-zinc-500">When someone follows this account, they'll appear here.</p>
                 </div>
               )}
 
-              {!isLoading &&
-                !isError &&
-                followers.length === 0 && (
-                  <div className="flex flex-col items-center justify-center py-16">
-                    <Users
-                      size={44}
-                      className="text-zinc-700"
-                    />
-
-                    <h3 className="mt-4 text-lg font-semibold text-white">
-                      No Followers Yet
-                    </h3>
-
-                    <p className="mt-2 text-sm text-zinc-500">
-                      When someone follows this account,
-                      they'll appear here.
-                    </p>
-                  </div>
-                )}
-
-              {!isLoading &&
-                !isError &&
-                followers.map((user) => (
-                  <UserRow
-                    key={user.id}
-                    user={user}
-                    onNavigate={onNavigate}
-                    profileUserId={userId}
-                  />
-                ))}
+              {!isLoading && !isError && followers.map((user) => (
+                <UserRow key={user.id} user={user} onNavigate={onNavigate} profileUserId={userId} />
+              ))}
             </div>
           </motion.div>
         </motion.div>
