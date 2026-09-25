@@ -1,95 +1,324 @@
-import React from 'react'
-import { useNavigate, Link } from 'react-router-dom'
-import { useAuth } from '../hooks/useAuth'
-import { useForm } from 'react-hook-form'
-import { useMutation } from '@tanstack/react-query'
-import { getMe, registerUser } from '../api/auth.api'
-import toast from 'react-hot-toast'
+import React from "react";
 
+import {
+  Link,
+  useNavigate,
+} from "react-router-dom";
+
+import {
+  useForm,
+} from "react-hook-form";
+
+import {
+  useMutation,
+} from "@tanstack/react-query";
+
+import toast from "react-hot-toast";
+
+import {
+  getMe,
+  registerUser,
+} from "../api/auth.api";
+
+import {
+  useAuth,
+} from "../hooks/useAuth";
+
+import GoogleButton from "../components/auth/GoogleButton";
 
 const Register = () => {
-  const navigate = useNavigate();
+  const navigate =
+    useNavigate();
 
-  const { setUser } = useAuth();
+  const {
+    setUser,
+  } = useAuth();
 
-  const { register, handleSubmit, formState: { errors } } = useForm();
-
-  const registerMutation = useMutation({
-    mutationFn: registerUser,
-    onSuccess: async () => {
-      try {
-        const me = await getMe();
-        setUser(me.data);
-        toast.success("Account created 🚀")
-        navigate('/');
-      } catch (error) {
-        toast.error("Failed to fetch user")
-      }
+  const {
+    register,
+    handleSubmit,
+    formState: {
+      errors,
     },
+  } = useForm();
 
-    onError: (error) => {
-      toast.error(error?.response?.data?.message || "Registration failed")
-    }
+  const registerMutation =
+    useMutation({
+      mutationFn:
+        registerUser,
 
-  })
+      onSuccess: async (
+        response
+      ) => {
+        try {
+          const me =
+            await getMe();
 
-  const onSubmit = (formValues) => {
-    const formData = new FormData();
+          setUser(me.data);
 
-    formData.append("username", formValues.username);
-    formData.append("email", formValues.email);
-    formData.append("password", formValues.password);
-    formData.append("bio", formValues.bio || "")
+          toast.success(
+            "Account created 🚀"
+          );
 
-    if (formValues.profileImg?.[0]) {
-      formData.append("profileImg", formValues.profileImg[0])
-    }
+          navigate(
+            `/verify-email?email=${encodeURIComponent(
+              me.data.email
+            )}`
+          );
+        } catch {
+          toast.error(
+            "Account created, but user data could not be loaded."
+          );
+        }
+      },
 
-    registerMutation.mutate(formData)
-  }
+      onError: (error) => {
+        toast.error(
+          error?.response?.data
+            ?.message ||
+            "Registration failed"
+        );
+      },
+    });
+
+  const onSubmit =
+    (formValues) => {
+      const formData =
+        new FormData();
+
+      formData.append(
+        "username",
+        formValues.username
+      );
+
+      formData.append(
+        "email",
+        formValues.email
+      );
+
+      formData.append(
+        "password",
+        formValues.password
+      );
+
+      formData.append(
+        "bio",
+        formValues.bio || ""
+      );
+
+      if (
+        formValues.profileImg?.[0]
+      ) {
+        formData.append(
+          "profileImg",
+          formValues
+            .profileImg[0]
+        );
+      }
+
+      registerMutation.mutate(
+        formData
+      );
+    };
 
   return (
-    <div className='min-h-screen flex items-center justify-center bg-zinc-950'>
+    <div className="min-h-screen bg-zinc-950 flex items-center justify-center px-4">
 
-      <form onSubmit={handleSubmit(onSubmit)} className='w-full max-w-md bg-zinc-900 p-8 rounded-2xl border border-zinc-950'>
+      <form
+        onSubmit={handleSubmit(
+          onSubmit
+        )}
+        className="
+          w-full
+          max-w-md
+          rounded-2xl
+          border
+          border-zinc-800
+          bg-zinc-900
+          p-6
+          sm:p-8
+        "
+      >
+        <h1 className="text-3xl font-bold text-white text-center">
+          Create your ORBIT account
+        </h1>
 
-        <h1 className='text-3xl font-bold text-white mb-6 text-center'>Register</h1>
+        <div className="mt-7">
 
-        <div className='space-y-4'>
-
-          <input type="text" placeholder='Username' {...register("username", { required: "Username required" })}
-            className='w-full p-3 rounded-lg bg-zinc-800 text-white' />
-
-          {errors.username && (
-            <p className='text-red-500 text-sm'>{errors.username.message}</p>
-          )}
-
-          <input type="email" placeholder='Email' {...register("email", {required: "Email is required"})}
-          className='w-full p-3 rounded-lg bg-zinc-800 text-white' />
-
-          {errors.email && (<p className='text-red-500 text-sm'>{errors.email.message}</p>)}
-
-          <input type="password" placeholder='Password' {...register("password", {required: "Password is required"})}
-          className='w-full p-3 rounded-lg bg-zinc-800 text-white' />
-
-          {errors.password && (<p className='text-red-500 text-sm'>{errors.password.message}</p>)}
-
-          <textarea placeholder='Bio (optional)' 
-          {...register("bio")}className='w-full p-3 rounded-lg bg-zinc-800 text-white resize-none' />
-
-          <button type='submit' disabled={registerMutation.isPending}
-            className='w-full bg-blue-600 hover:bg-blue-700 transition p-3 rounded-lg text-white font-semibold'>
-            {registerMutation.isPending ? "Creating..." : "Register"}
-          </button>
+          <GoogleButton
+            text="Sign up with Google"
+          />
 
         </div>
 
-        <p className='text-center text-zinc-400 mt-5'>Already have an account?
-          <Link to="/login" className='text-blue-500 ml-2' >Login</Link>
+        <div className="my-6 flex items-center gap-3">
+          <div className="h-px flex-1 bg-zinc-800" />
+
+          <span className="text-xs text-zinc-600">
+            OR
+          </span>
+
+          <div className="h-px flex-1 bg-zinc-800" />
+        </div>
+
+        <div className="space-y-4">
+
+          <div>
+            <input
+              type="text"
+              placeholder="Username"
+              {...register(
+                "username",
+                {
+                  required:
+                    "Username required",
+                }
+              )}
+              className="
+                w-full
+                rounded-lg
+                bg-zinc-800
+                p-3
+                text-white
+                outline-none
+              "
+            />
+
+            {errors.username && (
+              <p className="mt-1 text-sm text-red-500">
+                {
+                  errors
+                    .username
+                    .message
+                }
+              </p>
+            )}
+          </div>
+
+          <div>
+            <input
+              type="email"
+              placeholder="Email"
+              {...register(
+                "email",
+                {
+                  required:
+                    "Email is required",
+                }
+              )}
+              className="
+                w-full
+                rounded-lg
+                bg-zinc-800
+                p-3
+                text-white
+                outline-none
+              "
+            />
+
+            {errors.email && (
+              <p className="mt-1 text-sm text-red-500">
+                {
+                  errors
+                    .email
+                    .message
+                }
+              </p>
+            )}
+          </div>
+
+          <div>
+            <input
+              type="password"
+              placeholder="Password"
+              {...register(
+                "password",
+                {
+                  required:
+                    "Password is required",
+                }
+              )}
+              className="
+                w-full
+                rounded-lg
+                bg-zinc-800
+                p-3
+                text-white
+                outline-none
+              "
+            />
+
+            {errors.password && (
+              <p className="mt-1 text-sm text-red-500">
+                {
+                  errors
+                    .password
+                    .message
+                }
+              </p>
+            )}
+          </div>
+
+          <textarea
+            placeholder="Bio (optional)"
+            {...register(
+              "bio"
+            )}
+            className="
+              w-full
+              rounded-lg
+              bg-zinc-800
+              p-3
+              text-white
+              resize-none
+              outline-none
+            "
+          />
+
+          <input
+            type="file"
+            accept="image/*"
+            {...register(
+              "profileImg"
+            )}
+            className="w-full text-white"
+          />
+
+          <button
+            type="submit"
+            disabled={
+              registerMutation.isPending
+            }
+            className="
+              w-full
+              rounded-lg
+              bg-blue-600
+              p-3
+              font-semibold
+              text-white
+              hover:bg-blue-500
+              disabled:opacity-50
+            "
+          >
+            {registerMutation.isPending
+              ? "Creating..."
+              : "Register"}
+          </button>
+        </div>
+
+        <p className="mt-6 text-center text-zinc-400">
+          Already have an account?
+
+          <Link
+            to="/login"
+            className="ml-2 text-blue-500"
+          >
+            Login
+          </Link>
         </p>
       </form>
     </div>
-  )
-}
+  );
+};
 
-export default Register
+export default Register;

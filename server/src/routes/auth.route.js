@@ -1,34 +1,67 @@
-const express = require('express')
+const express = require("express");
+
 const router = express.Router();
 
-const { registerController, loginController, refreshController, logoutController, logoutAllController, getMeController, updateProfileController } = require('../controllers/auth.controller')
+const { registerController, loginController, getMeController, refreshController, logoutController, logoutAllController, updateProfileController, verifyEmailController, resendVerificationController, forgotPasswordController, resetPasswordController, googleAuthController, googleCallbackController, } = require("../controllers/auth.controller");
 
-const validate = require('../middlewares/validate.middleware')
+const validate = require("../middlewares/validate.middleware");
 
-const { registerSchema, loginSchema, refreshSchema, logoutSchema, updateProfileSchema } = require('../validators/auth.validator')
+const upload = require("../middlewares/upload.middleware");
 
-const upload = require('../middlewares/upload.middleware')
+const authMiddleware = require("../middlewares/auth.middleware");
 
-const authMiddleware = require('../middlewares/auth.middleware')
+const { registerSchema, loginSchema, tokenSchema, resendVerificationSchema, forgotPasswordSchema, resetPasswordSchema, updateProfileSchema, } = require("../validators/auth.validator");
 
+const { authLimiter, sensitiveAuthLimiter, } = require("../middlewares/authRateLimit.middleware");
 
-router.post('/register',
-  upload.single("profileImg"),
-  validate(registerSchema),
-  registerController)
+/* =====================================================
+   LOCAL AUTH
+===================================================== */
 
-router.post('/login',
-  validate(loginSchema),
-  loginController)
+router.post("/register", authLimiter, upload.single("profileImg"), validate(registerSchema), registerController);
 
-router.get('/me', authMiddleware, getMeController)
+router.post("/login", authLimiter, validate(loginSchema), loginController);
 
-router.post('/refresh', refreshController)
+/* =====================================================
+   GOOGLE
+===================================================== */
 
-router.post('/logout', logoutController)
+router.get("/google", authLimiter, googleAuthController);
 
-router.post('/logout-all', authMiddleware, logoutAllController)
+router.get("/google/callback", googleCallbackController);
 
-router.patch('/profile', authMiddleware, upload.single("profileImg"), validate(updateProfileSchema), updateProfileController)
+/* =====================================================
+   AUTH SESSION
+===================================================== */
+
+router.get("/me", authMiddleware, getMeController);
+
+router.post("/refresh", authLimiter, refreshController);
+
+router.post("/logout", logoutController);
+
+router.post("/logout-all", authMiddleware, logoutAllController);
+
+/* =====================================================
+   EMAIL VERIFICATION
+===================================================== */
+
+router.post("/verify-email", sensitiveAuthLimiter, validate(tokenSchema), verifyEmailController);
+
+router.post("/resend-verification", sensitiveAuthLimiter, validate(resendVerificationSchema), resendVerificationController);
+
+/* =====================================================
+   PASSWORD RECOVERY
+===================================================== */
+
+router.post("/forgot-password", sensitiveAuthLimiter, validate(forgotPasswordSchema), forgotPasswordController);
+
+router.post("/reset-password", sensitiveAuthLimiter, validate(resetPasswordSchema), resetPasswordController);
+
+/* =====================================================
+   PROFILE
+===================================================== */
+
+router.patch("/profile", authMiddleware, upload.single("profileImg"), validate(updateProfileSchema), updateProfileController);
 
 module.exports = router;
