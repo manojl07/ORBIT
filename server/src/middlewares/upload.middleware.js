@@ -7,7 +7,6 @@ const allowedExtensions = [".jpg", ".jpeg", ".png", ".gif", ".webp", ".jfif", ".
 
 const upload = multer({
   storage,
-
   limits: {
     fileSize: 20 * 1024 * 1024,
   },

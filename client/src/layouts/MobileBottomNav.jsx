@@ -1,13 +1,6 @@
 import { useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import {
-  Home,
-  Search,
-  Plus,
-  Heart,
-  User,
-  X,
-} from "lucide-react";
+import { Home, Search, Plus, Heart, User, X, } from "lucide-react";
 
 import SearchBar from "../components/search/SearchBar";
 
@@ -19,46 +12,22 @@ const MobileBottomNav = ({ onOpenModal }) => {
 
   const isHome = location.pathname === "/";
 
-  const isProfile =
-    location.pathname === "/profile" ||
-    location.pathname.startsWith("/profile/");
+  const isProfile = location.pathname === "/profile" || location.pathname.startsWith("/profile/");
 
-  const handleHome = () => {
-    setSearchOpen(false);
-    navigate("/");
-  };
+  const handleHome = () => { setSearchOpen(false); navigate("/"); };
 
-  const handleSearch = () => {
-    setSearchOpen(true);
-  };
+  const handleSearch = () => { setSearchOpen(true); };
 
-  const handleCreate = () => {
-    setSearchOpen(false);
-    onOpenModal?.();
-  };
+  const handleCreate = () => { setSearchOpen(false); onOpenModal?.(); };
 
-  const handleProfile = () => {
-    setSearchOpen(false);
-    navigate("/profile");
-  };
+  const handleProfile = () => { setSearchOpen(false); navigate("/profile"); };
 
   return (
     <>
       {/* MOBILE SEARCH */}
-{searchOpen && (
-  <div
-    className="
-      md:hidden
-      fixed
-      left-3
-      right-3
-      top-[4.5rem]
-      bottom-24
-      z-[110]
-    "
-  >
-    <div
-      className="
+      {searchOpen && (
+        <div className="md:hidden fixed left-3 right-3 top-[4.5rem] bottom-24 z-[110]" >
+          <div className="
         relative
         w-full
         max-w-md
@@ -71,18 +40,18 @@ const MobileBottomNav = ({ onOpenModal }) => {
         shadow-[0_20px_60px_rgba(0,0,0,0.55)]
         p-2.5
       "
-    >
+          >
 
-      <SearchBar
-        autoFocus
-        onClosePanel={() =>
-          setSearchOpen(false)
-        }
-      />
+            <SearchBar
+              autoFocus
+              onClosePanel={() =>
+                setSearchOpen(false)
+              }
+            />
 
-    </div>
-  </div>
-)}
+          </div>
+        </div>
+      )}
 
       {/* MOBILE BOTTOM NAV */}
       <nav className="md:hidden fixed left-3 right-3 bottom-3 z-[100]">
@@ -151,7 +120,7 @@ const MobileBottomNav = ({ onOpenModal }) => {
             <NavButton
               icon={<Heart size={21} />}
               label="Activity"
-              onClick={() => {}}
+              onClick={() => { }}
             />
 
             {/* PROFILE */}
@@ -190,10 +159,9 @@ const NavButton = ({
         transition-all
         duration-200
 
-        ${
-          active
-            ? "bg-white/10 text-white"
-            : "text-zinc-400 hover:text-white"
+        ${active
+          ? "bg-white/10 text-white"
+          : "text-zinc-400 hover:text-white"
         }
       `}
     >

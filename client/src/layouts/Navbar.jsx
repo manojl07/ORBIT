@@ -17,9 +17,7 @@ import { useAuth } from "../hooks/useAuth";
 import useLogout from "../hooks/useLogout";
 import SearchBar from "../components/search/SearchBar";
 
-
 const Navbar = ({ onOpenModal }) => {
-
   const { user } = useAuth();
 
   const {
@@ -31,22 +29,18 @@ const Navbar = ({ onOpenModal }) => {
 
   const menuRef = useRef(null);
 
-
   /* ========================================
      CLOSE PROFILE MENU WHEN CLICKING OUTSIDE
   ======================================== */
 
   useEffect(() => {
-
     const handleOutsideClick = (event) => {
-
       if (
         menuRef.current &&
         !menuRef.current.contains(event.target)
       ) {
         setOpen(false);
       }
-
     };
 
     document.addEventListener(
@@ -55,43 +49,30 @@ const Navbar = ({ onOpenModal }) => {
     );
 
     return () => {
-
       document.removeEventListener(
         "mousedown",
         handleOutsideClick
       );
-
     };
-
   }, []);
-
 
   /* ========================================
      LOGOUT
   ======================================== */
 
   const handleLogout = async () => {
-
     try {
-
       await logout();
-
       setOpen(false);
-
     } catch (error) {
-
       console.error(
         "Logout failed:",
         error
       );
-
     }
-
   };
 
-
   return (
-
     <nav
       className="
         sticky
@@ -103,29 +84,36 @@ const Navbar = ({ onOpenModal }) => {
         border-zinc-800/70
       "
     >
-
       <div
         className="
           max-w-6xl
           mx-auto
+
           h-16
           sm:h-17
+
           px-4
           sm:px-6
           lg:px-8
 
-          grid
-          grid-cols-3
+          flex
           items-center
+          justify-between
+
+          md:grid
+          md:grid-cols-3
         "
       >
-
         {/* ========================================
             LEFT — LOGO
         ======================================== */}
 
-        <div className="flex justify-start">
-
+        <div
+          className="
+            flex
+            justify-start
+          "
+        >
           <Link
             to="/"
             className="
@@ -158,25 +146,22 @@ const Navbar = ({ onOpenModal }) => {
           >
             Orbit
           </Link>
-
         </div>
-
 
         {/* ========================================
             CENTER — SEARCH
         ======================================== */}
 
-        <div className="
-          hidden
-          md:flex
-          justify-center
-          w-full
-        ">
-
+        <div
+          className="
+            hidden
+            md:flex
+            justify-center
+            w-full
+          "
+        >
           <SearchBar />
-
         </div>
-
 
         {/* ========================================
             RIGHT — CREATE + PROFILE
@@ -191,7 +176,6 @@ const Navbar = ({ onOpenModal }) => {
             sm:gap-4
           "
         >
-
           {/* ======================================
               CREATE POST
           ====================================== */}
@@ -227,14 +211,11 @@ const Navbar = ({ onOpenModal }) => {
             "
             aria-label="Create post"
           >
-
             <Plus
               size={24}
               strokeWidth={2}
             />
-
           </button>
-
 
           {/* ======================================
               PROFILE
@@ -244,19 +225,16 @@ const Navbar = ({ onOpenModal }) => {
             ref={menuRef}
             className="relative"
           >
-
             {/* PROFILE BUTTON */}
 
             <button
               type="button"
               onClick={(event) => {
-
                 event.stopPropagation();
 
                 setOpen(
                   (prev) => !prev
                 );
-
               }}
               className="
                 flex
@@ -275,7 +253,6 @@ const Navbar = ({ onOpenModal }) => {
               aria-label="Open profile menu"
               aria-expanded={open}
             >
-
               <img
                 src={user?.profileImg}
                 alt={
@@ -313,16 +290,13 @@ const Navbar = ({ onOpenModal }) => {
                   }
                 `}
               />
-
             </button>
-
 
             {/* ====================================
                 DROPDOWN
             ==================================== */}
 
             {open && (
-
               <div
                 onClick={(event) =>
                   event.stopPropagation()
@@ -348,7 +322,6 @@ const Navbar = ({ onOpenModal }) => {
                   shadow-[0_20px_60px_rgba(0,0,0,0.65)]
                 "
               >
-
                 {/* PROFILE */}
 
                 <Link
@@ -372,15 +345,12 @@ const Navbar = ({ onOpenModal }) => {
                     transition-colors
                   "
                 >
-
                   <User size={18} />
 
                   <span>
                     Profile
                   </span>
-
                 </Link>
-
 
                 {/* LOGOUT */}
 
@@ -411,28 +381,19 @@ const Navbar = ({ onOpenModal }) => {
                     disabled:cursor-not-allowed
                   "
                 >
-
                   <LogOut size={18} />
 
                   <span>
-                    {
-                      isLoggingOut
-                        ? "Logging out..."
-                        : "Logout"
-                    }
+                    {isLoggingOut
+                      ? "Logging out..."
+                      : "Logout"}
                   </span>
-
                 </button>
-
               </div>
             )}
-
           </div>
-
         </div>
-
       </div>
-
     </nav>
   );
 };

@@ -1,20 +1,40 @@
 export const queryKeys = {
-  // Feed
   feed: ["feed"],
 
-  // Profile
-  profile: (userId) => ["user-profile", userId],
+  profile: (userId) => [
+    "user-profile",
+    userId,
+  ],
 
-  // Posts
-  userPosts: (userId) => ["user-posts", userId],
+  userPosts: (userId) => [
+    "user-posts",
+    userId,
+  ],
 
-  // Comments
-  comments: (postId) => ["comments", postId],
+  comments: (postId) => [
+    "comments",
+    postId,
+  ],
 
-  // Social
-  followers: (userId) => ["followers", userId],
-  following: (userId) => ["following", userId],
+  followers: (userId) => [
+    "followers",
+    userId,
+  ],
 
-  // Search
-  searchUsers: (query) => ["search-users", query],
+  following: (userId) => [
+    "following",
+    userId,
+  ],
+
+  searchUsers: (query) => [
+    "search-users",
+    query,
+  ],
+
+  usernameAvailability: (
+    username
+  ) => [
+    "username-availability",
+    username,
+  ],
 };

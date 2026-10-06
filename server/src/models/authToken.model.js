@@ -2,34 +2,15 @@ const mongoose = require("mongoose");
 
 const authTokenSchema = new mongoose.Schema(
   {
-    user: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "User",
-      required: true,
-      index: true,
-    },
+    user: {type: mongoose.Schema.Types.ObjectId,ref: "User",required: true,index: true,},
 
-    tokenHash: {
-      type: String,
-      required: true,
-      unique: true,
-    },
+    tokenHash: {type: String,required: true,unique: true,},
 
-    type: {
-      type: String,
-      enum: ["emailVerification", "passwordReset",],
-      required: true,
-      index: true,
-    },
+    type: {type: String,enum: ["emailVerification", "passwordReset",],required: true,index: true,},
 
-    expiresAt: {
-      type: Date,
-      required: true,
-    },
+    expiresAt: {type: Date,required: true,},
   },
-  {
-    timestamps: true,
-  }
+  {timestamps: true,}
 );
 
 /*

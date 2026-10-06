@@ -1,11 +1,14 @@
-const Post = require("../models/post.model")
-const ApiError = require("../utils/ApiError")
+const Post = require("../models/post.model");
+const User = require("../models/user.model");
+const ApiError = require("../utils/ApiError");
 
-const { uploadImage, deleteImage } = require("./image.service")
+const { uploadImage, deleteImage, } = require("./image.service");
 
-const Like = require('../models/like.model')
+const Like = require("../models/like.model");
 
-
+/* =====================================================
+   SANITIZE POST
+===================================================== */
 const sanitizePost = (post) => ({
   id: post._id,
   _id: post._id,
@@ -19,9 +22,13 @@ const sanitizePost = (post) => ({
   createdAt: post.createdAt,
 });
 
-const createPost = async ({ caption, image, userId }) => {
+/* =====================================================
+   CREATE POST
+===================================================== */
+
+const createPost = async ({ caption, image, userId, }) => {
   if (!image) {
-    throw new ApiError(400, "Image is required")
+    throw new ApiError(400, "Image is required");
   }
 
   const uploadedImage = await uploadImage(image, "/orbit/post-images");
@@ -31,10 +38,14 @@ const createPost = async ({ caption, image, userId }) => {
     imageUrl: uploadedImage.imageUrl,
     imageFileId: uploadedImage.imageFileId,
     user: userId,
-  })
+  });
 
   return post;
-}
+};
+
+/* =====================================================
+   DELETE POST
+===================================================== */
 
 const deletePost = async (postId, userId) => {
   const post = await Post.findById(postId);
@@ -43,120 +54,116 @@ const deletePost = async (postId, userId) => {
     throw new ApiError(404, "Post not found");
   }
 
-  // Ownership check
-  if (String(post.user) !== String(userId)) {
+  if (String(post.user) !== String(userId)
+  ) {
     throw new ApiError(403, "Unauthorized");
   }
 
-  // Delete MongoDB record first
   await Post.findByIdAndDelete(postId);
 
-  // Image deletion is cleanup.
-  // It should NOT prevent the post from being deleted.
   if (post.imageFileId) {
     try {
       await deleteImage(post.imageFileId);
     } catch (error) {
-      console.error(
-        "Failed to delete image from ImageKit:",
-        error.message
-      );
+      console.error("Failed to delete image from ImageKit:", error.message);
     }
   }
 
   return true;
 };
 
-const getUserPosts = async ({ userId, currentUserId, page = 1, limit = 12 }) => {
+/* =====================================================
+   GET USER POSTS
+===================================================== */
+
+const getUserPosts = async ({ userId, currentUserId, page = 1, limit = 12, }) => {
   const skip = (page - 1) * limit;
 
-  const [posts, total, userLikes] = await Promise.all([
-    Post.find({ user: userId })
-      .populate("user", "username profileImg")
-      .sort({ createdAt: -1 })
-      .skip(skip)
-      .limit(limit)
-      .lean(),
+  const [posts, total, userLikes,] = await Promise.all([
+    Post.find({ user: userId, }).populate("user", "username profileImg").sort({ createdAt: -1, }).skip(skip).limit(limit).lean(),
+    Post.countDocuments({ user: userId, }),
+    Like.find({ user: currentUserId, }).select("post"),
+  ]);
 
-    Post.countDocuments({ user: userId }),
+  /*
+   * Protect against orphaned posts.
+   * A post can exist while its referenced
+   * user document no longer exists.
+   */
+  const validPosts = posts.filter((post) => post.user);
 
-    Like.find({ user: currentUserId }).select("post")
-  ])
+  const likedPosts = new Set(userLikes.map((like) => like.post.toString()));
 
-  const likedPosts = new Set(userLikes.map((like) => like.post.toString()))
-
-  const formattedPosts = posts.map((post) => ({
+  const formattedPosts = validPosts.map((post) => ({
     ...post,
     isLiked: likedPosts.has(post._id.toString()),
-    user: {
-      ...post.user,
-    }
-  }))
-
-  return {
-    posts: formattedPosts.map(sanitizePost),
-    pagination: {
-      page, limit, total, totalPages: Math.ceil(total / limit)
-    }
-  }
-}
-
-const getFeed = async ({ page = 1, limit = 10, userId }) => {
-  const skip = (page - 1) * limit;
-
-  const [posts, total, userLikes] = await Promise.all([
-    Post.find()
-      .populate(
-        "user",
-        "username profileImg followers"
-      )
-      .sort({ createdAt: -1 })
-      .skip(skip)
-      .limit(limit)
-      .lean(),
-
-    Post.countDocuments(),
-
-
-    Like.find({ user: userId }).select("post")
-  ])
-
-  const likedPosts = new Set(userLikes.map(like => like.post.toString()))
-
-  const formattedPosts = posts.map((post) => ({
-    ...post,
-
-    isLiked: likedPosts.has(post._id.toString()),
-
-    user: {
-      ...post.user,
-
-      isFollowing: post.user.followers.some(
-        (id) => id.toString() === userId
-      ),
-    },
+    user: { ...post.user, },
   }));
 
   return {
     posts: formattedPosts.map(sanitizePost),
-    pagination: {
-      page,
-      limit,
-      total,
-      totalPages: Math.ceil(total / limit)
-    }
-  }
-}
+    pagination: { page, limit, total, totalPages: Math.ceil(total / limit), },
+  };
+};
 
-const toggleLike = async (postId, userId) => {
+/* =====================================================
+   GET FEED
+===================================================== */
 
+const getFeed = async ({ page = 1, limit = 10, userId, }) => {
+  const skip = (page - 1) * limit;
+
+  const [posts, total, userLikes,] = await Promise.all([
+    Post.find().populate("user", "username profileImg followers").sort({ createdAt: -1, }).skip(skip).limit(limit).lean(),
+    Post.countDocuments(),
+    Like.find({ user: userId, }).select("post"),
+  ]);
+
+  const likedPosts = new Set(userLikes.map((like) => like.post.toString()));
+
+  /*
+   * IMPORTANT:
+   *
+   * populate() returns null when the
+   * referenced User document does not exist.
+   *
+   * Never allow one orphaned post to crash
+   * the complete feed.
+   */
+  const validPosts = posts.filter((post) => post.user);
+
+  const formattedPosts = validPosts.map((post) => {
+    const followers = Array.isArray(post.user.followers) ? post.user.followers : [];
+
+    return {
+      ...post,
+      isLiked:likedPosts.has(post._id.toString()),
+      user: {
+        ...post.user,
+        isFollowing:followers.some((id) =>id.toString() ===String(userId)),
+      },
+    };
+  });
+
+  return {
+    posts:formattedPosts.map(sanitizePost),
+
+    pagination: {page,limit,total,totalPages:Math.ceil(total / limit),},
+  };
+};
+
+/* =====================================================
+   TOGGLE LIKE
+===================================================== */
+
+const toggleLike = async (postId,userId) => {
   const post = await Post.findById(postId);
 
   if (!post) {
-    throw new ApiError(404, "Post not found");
+    throw new ApiError(404,"Post not found");
   }
 
-  const existingLike = await Like.findOne({ user: userId, post: postId });
+  const existingLike =await Like.findOne({user: userId,post: postId,});
 
   if (existingLike) {
     await Like.findByIdAndDelete(existingLike._id);
@@ -165,22 +172,20 @@ const toggleLike = async (postId, userId) => {
 
     await post.save();
 
-    return {
-      liked: false,
-      likesCount: post.likesCount,
-    }
+    return {liked: false,likesCount:post.likesCount,};
   }
 
-  await Like.create({ user: userId, post: postId })
+  await Like.create({user: userId,post: postId,});
 
   post.likesCount += 1;
 
   await post.save();
 
-  return {
-    liked: true,
-    likesCount: post.likesCount,
-  }
-}
+  return {liked: true,likesCount:post.likesCount,};
+};
 
-module.exports = { createPost, deletePost, getUserPosts, getFeed, toggleLike }
+/* =====================================================
+   EXPORTS
+===================================================== */
+
+module.exports = {createPost,deletePost,getUserPosts,getFeed,toggleLike,};

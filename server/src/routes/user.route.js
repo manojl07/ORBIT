@@ -1,18 +1,47 @@
-const express = require('express')
+const express = require("express");
+
 const router = express.Router();
-const authMiddleware = require('../middlewares/auth.middleware')
 
-const {getUserProfileController, toggleFollowController, searchUsersController, getFollowersController, getFollowingController} = require('../controllers/user.controller')
+const authMiddleware = require("../middlewares/auth.middleware");
 
+const validate = require("../middlewares/validate.middleware");
 
-router.get('/search', authMiddleware, searchUsersController);
+const {validateQuery,} = validate;
 
-router.get('/:userId/followers', authMiddleware, getFollowersController)
+const {checkUsernameSchema,} = require("../validators/auth.validator");
 
-router.get('/:userId/following', authMiddleware, getFollowingController)
+const {usernameCheckLimiter,} = require("../middlewares/authRateLimit.middleware");
 
-router.get('/:userId', authMiddleware, getUserProfileController);
+const {getUserProfileController,  checkUsernameController,  toggleFollowController,  searchUsersController,  getFollowersController,getFollowingController,} = require("../controllers/user.controller");
 
-router.patch('/:userId/follow', authMiddleware, toggleFollowController)
+/* =====================================================
+   SEARCH
+===================================================== */
+router.get("/search",authMiddleware,searchUsersController);
+
+/* =====================================================
+   USERNAME AVAILABILITY
+===================================================== */
+router.get("/check-username",authMiddleware,usernameCheckLimiter,validateQuery(checkUsernameSchema),checkUsernameController);
+
+/* =====================================================
+   FOLLOWERS
+===================================================== */
+router.get("/:userId/followers",authMiddleware,getFollowersController);
+
+/* =====================================================
+   FOLLOWING
+===================================================== */
+router.get("/:userId/following",authMiddleware,getFollowingController);
+
+/* =====================================================
+   PUBLIC PROFILE
+===================================================== */
+router.get("/:userId",  authMiddleware,getUserProfileController);
+
+/* =====================================================
+   FOLLOW / UNFOLLOW
+===================================================== */
+router.patch("/:userId/follow",authMiddleware,toggleFollowController);
 
 module.exports = router;

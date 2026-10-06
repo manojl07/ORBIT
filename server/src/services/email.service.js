@@ -13,13 +13,9 @@ const sendVerificationEmail = async ({ email, username, token, }) => {
     html: `
       <div style="font-family: Arial, sans-serif; line-height: 1.6;">
         <h2>Welcome to ORBIT 🚀</h2>
-
         <p>Hi ${username},</p>
-
         <p>Please verify your email address to secure your account.</p>
-
         <p><a href="${verificationUrl}" style="display:inline-block; padding:12px 20px; background:#2563eb; color:white; text-decoration:none; border-radius:8px;" >Verify Email</a></p>
-
         <p>This link expires in 24 hours.</p>
       </div>
     `,
@@ -37,11 +33,8 @@ const sendPasswordResetEmail = async ({ email, username, token, }) => {
     html: `
       <div style="font-family: Arial, sans-serif; line-height: 1.6;">
         <h2>Reset your ORBIT password</h2>
-
         <p>Hi ${username},</p>
-
         <p>We received a request to reset your password.</p>
-
         <p>
           <a href="${resetUrl}" style="display:inline-block; padding:12px 20px; background:#2563eb; color:white; text-decoration:none; border-radius:8px;" >Reset Password</a>
         </p>

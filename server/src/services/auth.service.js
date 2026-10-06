@@ -20,7 +20,6 @@ const { sendVerificationEmail, sendPasswordResetEmail, } = require("./email.serv
 /* =====================================================
    USER SANITIZER
 ===================================================== */
-
 const sanitizeUser = (user) => ({
   id: user._id,
   username: user.username,
@@ -36,7 +35,6 @@ const sanitizeUser = (user) => ({
 /* =====================================================
    HASH REFRESH TOKEN
 ===================================================== */
-
 const hashToken = (token) => {
   return crypto.createHash("sha256").update(token).digest("hex");
 };
@@ -44,137 +42,89 @@ const hashToken = (token) => {
 /* =====================================================
    FIND LOCAL USER
 ===================================================== */
-
 const findUser = async (identifier) => {
   const normalized = identifier.trim().toLowerCase();
-
-  const user = await User.findOne({
-    $or: [{ email: normalized }, { username: normalized },],
-  }).select("+password");
-
-  if (!user) {
-    throw new ApiError(401, "Invalid credentials");
-  }
-
+  const user = await User.findOne({$or: [{ email: normalized }, { username: normalized },],}).select("+password");
+  if (!user) throw new ApiError(401, "Invalid credentials");
   return user;
 };
 
 /* =====================================================
    SESSION
 ===================================================== */
-
 const createSession = async ({ user, refreshToken, deviceId, userAgent, ipAddress, }) => {
   const tokenHash = hashToken(refreshToken);
-
   return Session.create({ user: user._id, tokenHash, deviceId, userAgent, ipAddress, expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), });
 };
 
 /* =====================================================
    CREATE ONE-TIME TOKEN
 ===================================================== */
-
 const createAuthToken = async ({ userId, type, expiresIn, }) => {
   await AuthToken.deleteMany({ user: userId, type, });
-
   const rawToken = generateOneTimeToken();
-
   const tokenHash = hashOneTimeToken(rawToken);
-
   await AuthToken.create({ user: userId, tokenHash, type, expiresAt: new Date(Date.now() + expiresIn), });
-
   return rawToken;
 };
 
 /* =====================================================
    REGISTER
 ===================================================== */
-
 const register = async ({ username, email, password, bio, deviceId, userAgent, ipAddress, profileImg, }) => {
+
   username = username.trim().toLowerCase();
-
   email = email.trim().toLowerCase();
-
   const existing = await User.findOne({ $or: [{ email }, { username },], });
 
-  if (existing) {
-    throw new ApiError(409, "User already exists");
-  }
+  if (existing) throw new ApiError(409, "User already exists");
 
   const uploadedImage = profileImg ? await uploadImage(profileImg) : null;
-
   const userData = { username, email, password, bio, };
 
   if (uploadedImage) {
     userData.profileImg = uploadedImage.imageUrl;
-
     userData.profileImgFileId = uploadedImage.imageFileId ?? uploadedImage.fileId ?? null;
   }
 
   const user = await User.create(userData);
-
   const verificationToken = await createAuthToken({ userId: user._id, type: "emailVerification", expiresIn: 24 * 60 * 60 * 1000, });
-
   let verificationEmailSent = true;
 
   try {
-    await sendVerificationEmail({
-      email: user.email, username: user.username, token: verificationToken,
-    });
+    await sendVerificationEmail({ email: user.email, username: user.username, token: verificationToken, });
   } catch (error) {
     verificationEmailSent = false;
-
     console.error("Verification email failed:", error);
   }
 
   const { accessToken, refreshToken, } = createTokens(user);
-
   const session = await createSession({ user, refreshToken, deviceId, userAgent, ipAddress, });
-
   const postsCount = await Post.countDocuments({ user: user._id, });
 
   return {
-    user: {
-      ...sanitizeUser(user),
-      postsCount,
-    },
-    accessToken,
-    refreshToken,
-    sessionId: session._id,
-    deviceId,
-    verificationEmailSent,
+    user: { ...sanitizeUser(user), postsCount, }, accessToken, refreshToken, sessionId: session._id, deviceId, verificationEmailSent,
   };
 };
 
 /* =====================================================
    LOGIN
 ===================================================== */
-
 const login = async ({ identifier, password, deviceId, userAgent, ipAddress, }) => {
   const user = await findUser(identifier);
-
   const matched = await user.comparePassword(password);
 
-  if (!matched) {
-    throw new ApiError(401, "Invalid credentials");
-  }
-
+  if (!matched) throw new ApiError(401, "Invalid credentials");
+  
   const { accessToken, refreshToken, } = createTokens(user);
-
   const session = await createSession({ user, refreshToken, deviceId, userAgent, ipAddress, });
 
-  return {
-    user: sanitizeUser(user),
-    accessToken,
-    refreshToken,
-    sessionId: session._id,
-    deviceId,
-  };
+  return {user: sanitizeUser(user),accessToken,refreshToken,sessionId: session._id,deviceId,};
 };
 
 /* =====================================================
    GOOGLE LOGIN
 ===================================================== */
-
 const generateGoogleUsername = async (name, email) => {
   const emailPrefix = email.split("@")[0];
 
@@ -255,7 +205,6 @@ const loginWithGoogle = async ({ googleId, email, emailVerified, name, picture, 
 /* =====================================================
    GET ME
 ===================================================== */
-
 const getMe = async (userId) => {
   const user = await User.findById(userId);
 
@@ -274,7 +223,6 @@ const getMe = async (userId) => {
 /* =====================================================
    REFRESH
 ===================================================== */
-
 const refresh = async ({ refreshToken, deviceId, userAgent, ipAddress, }) => {
   if (!refreshToken) {
     throw new ApiError(401, "Refresh token missing");
@@ -312,7 +260,6 @@ const refresh = async ({ refreshToken, deviceId, userAgent, ipAddress, }) => {
 /* =====================================================
    LOGOUT
 ===================================================== */
-
 const logout = async (refreshToken) => {
   if (!refreshToken) {
     return true;
@@ -334,7 +281,6 @@ const logoutAll = async (userId) => {
 /* =====================================================
    VERIFY EMAIL
 ===================================================== */
-
 const verifyEmail = async (rawToken) => {
   const tokenHash = hashOneTimeToken(rawToken);
 
@@ -364,7 +310,6 @@ const verifyEmail = async (rawToken) => {
 /* =====================================================
    RESEND VERIFICATION
 ===================================================== */
-
 const resendVerification = async (email) => {
 
   const normalized = email.trim().toLowerCase();
@@ -397,7 +342,6 @@ const resendVerification = async (email) => {
 /* =====================================================
    FORGOT PASSWORD
 ===================================================== */
-
 const forgotPassword = async (email) => {
   const normalized = email.trim().toLowerCase();
 
@@ -423,7 +367,6 @@ const forgotPassword = async (email) => {
 /* =====================================================
    RESET PASSWORD
 ===================================================== */
-
 const resetPassword = async ({ token, password, }) => {
   const tokenHash = hashOneTimeToken(token);
 
@@ -459,39 +402,130 @@ const resetPassword = async ({ token, password, }) => {
 /* =====================================================
    UPDATE PROFILE
 ===================================================== */
-
-const updateProfile = async ({ userId, bio, profileImg, }) => {
-  const user = await User.findById(userId);
+const updateProfile = async ({
+  userId,
+  username,
+  bio,
+  profileImg,
+}) => {
+  const user =
+    await User.findById(userId);
 
   if (!user) {
-    throw new ApiError(404, "User not found");
+    throw new ApiError(
+      404,
+      "User not found"
+    );
   }
+
+  /* ========================================
+     USERNAME
+  ======================================== */
+
+  if (username !== undefined) {
+    const normalizedUsername =
+      username
+        .trim()
+        .toLowerCase();
+
+    if (
+      normalizedUsername !==
+      user.username
+    ) {
+      const usernameExists =
+        await User.exists({
+          username:
+            normalizedUsername,
+
+          _id: {
+            $ne: user._id,
+          },
+        });
+
+      if (usernameExists) {
+        throw new ApiError(
+          409,
+          "Username is already taken",
+          "USERNAME_TAKEN"
+        );
+      }
+
+      user.username =
+        normalizedUsername;
+    }
+  }
+
+  /* ========================================
+     BIO
+  ======================================== */
 
   if (bio !== undefined) {
     user.bio = bio;
   }
 
+  /* ========================================
+     PROFILE IMAGE
+  ======================================== */
+
   if (profileImg) {
     if (user.profileImgFileId) {
-      await deleteImage(user.profileImgFileId);
+      await deleteImage(
+        user.profileImgFileId
+      );
     }
 
-    const uploaded = await uploadImage(profileImg, "/orbit/profile-images");
+    const uploaded =
+      await uploadImage(
+        profileImg,
+        "/orbit/profile-images"
+      );
 
-    user.profileImg = uploaded.imageUrl;
+    user.profileImg =
+      uploaded.imageUrl;
 
-    user.profileImgFileId = uploaded.imageFileId ?? uploaded.fileId ?? null;
+    user.profileImgFileId =
+      uploaded.imageFileId ??
+      uploaded.fileId ??
+      null;
   }
 
-  await user.save();
+  /* ========================================
+     SAVE
+  ======================================== */
 
-  const postsCount =await Post.countDocuments({user: user._id,});
+  try {
+    await user.save();
+  } catch (error) {
+    /*
+     * Availability checking improves UX,
+     * but MongoDB remains the final authority.
+     *
+     * This protects against two users attempting
+     * to claim the same username simultaneously.
+     */
+    if (
+      error.code === 11000 &&
+      error.keyPattern?.username
+    ) {
+      throw new ApiError(
+        409,
+        "Username is already taken",
+        "USERNAME_TAKEN"
+      );
+    }
+
+    throw error;
+  }
+
+  const postsCount =
+    await Post.countDocuments({
+      user: user._id,
+    });
 
   return {
     ...sanitizeUser(user),
-
     postsCount,
   };
 };
 
-module.exports = {register,  login,loginWithGoogle,getMe,refresh,  logout,  logoutAll,updateProfile,verifyEmail,resendVerification,forgotPassword,resetPassword,};
+module.exports = { register, login, loginWithGoogle, getMe, refresh, logout, logoutAll, updateProfile, verifyEmail, resendVerification, forgotPassword, resetPassword, };

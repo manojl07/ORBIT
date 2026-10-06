@@ -1,24 +1,15 @@
 const asyncHandler = require("../utils/asyncHandler");
 const ApiResponse = require("../utils/ApiResponse");
 const ApiError = require("../utils/ApiError");
-
 const crypto = require("crypto");
-
 const authService = require("../services/auth.service");
-
 const { accessCookieOptions, refreshCookieOptions, } = require("../config/cookie.config");
-
 const { getGoogleAuthUrl, exchangeGoogleCode, } = require("../config/google.config");
 
 
-
-
 const setAuthCookies = (res, { accessToken, refreshToken, deviceId, }) => {
-
   res.cookie("accessToken", accessToken, accessCookieOptions);
-
   res.cookie("refreshToken", refreshToken, refreshCookieOptions);
-
   res.cookie("deviceId", deviceId, { httpOnly: true, secure: process.env.NODE_ENV === "production", sameSite: "strict", maxAge: 7 * 24 * 60 * 60 * 1000, });
 };
 
@@ -27,7 +18,6 @@ const clearAuthCookies = (res) => {
   res.clearCookie("refreshToken");
   res.clearCookie("deviceId");
 };
-
 
 
 /* =====================================================
@@ -41,9 +31,7 @@ const registerController = asyncHandler(async (req, res) => {
     userAgent: req.get("user-agent"),
     ipAddress: req.ip,
   });
-
   setAuthCookies(res, result);
-
   return res.status(201).json(new ApiResponse(201, "User registered successfully", { user: result.user, sessionId: result.sessionId, verificationEmailSent: result.verificationEmailSent, }));
 });
 
@@ -53,18 +41,12 @@ const registerController = asyncHandler(async (req, res) => {
 const loginController = asyncHandler(async (req, res) => {
   const result = await authService.login({
     identifier: req.body.identifier,
-
     password: req.body.password,
-
     deviceId: crypto.randomUUID(),
-
     userAgent: req.get("user-agent"),
-
     ipAddress: req.ip,
   });
-
   setAuthCookies(res, result);
-
   return res.status(200).json(new ApiResponse(200, "Login successful", { user: result.user, sessionId: result.sessionId, }));
 });
 
@@ -73,7 +55,6 @@ const loginController = asyncHandler(async (req, res) => {
 ===================================================== */
 const getMeController = asyncHandler(async (req, res) => {
   const user = await authService.getMe(req.user.id);
-
   return res.status(200).json(new ApiResponse(200, "User fetched successfully", user));
 });
 
@@ -89,9 +70,7 @@ const refreshController = asyncHandler(async (req, res) => {
   });
 
   res.cookie("accessToken", result.accessToken, accessCookieOptions);
-
   res.cookie("refreshToken", result.refreshToken, refreshCookieOptions);
-
   return res.status(200).json(new ApiResponse(200, "Token refreshed", { sessionId: result.sessionId, }));
 });
 
@@ -100,9 +79,7 @@ const refreshController = asyncHandler(async (req, res) => {
 ===================================================== */
 const logoutController = asyncHandler(async (req, res) => {
   await authService.logout(req.cookies.refreshToken);
-
   clearAuthCookies(res);
-
   return res.status(200).json(new ApiResponse(200, "Logged out successfully"));
 });
 
@@ -111,9 +88,7 @@ const logoutController = asyncHandler(async (req, res) => {
 ===================================================== */
 const logoutAllController = asyncHandler(async (req, res) => {
   await authService.logoutAll(req.user.id);
-
   clearAuthCookies(res);
-
   return res.status(200).json(new ApiResponse(200, "Logged out from all devices"));
 });
 
@@ -121,15 +96,30 @@ const logoutAllController = asyncHandler(async (req, res) => {
    UPDATE PROFILE
 ===================================================== */
 const updateProfileController = asyncHandler(async (req, res) => {
-  const updatedUser = await authService.updateProfile({
-    userId: req.user.id,
-    bio: req.body.bio,
-    profileImg: req.file,
+    const updatedUser =
+      await authService.updateProfile({
+        userId: req.user.id,
+
+        username:
+          req.body.username,
+
+        bio:
+          req.body.bio,
+
+        profileImg:
+          req.file,
+      });
+
+    return res
+      .status(200)
+      .json(
+        new ApiResponse(
+          200,
+          "Profile updated successfully",
+          updatedUser
+        )
+      );
   });
-
-  return res.status(200).json(new ApiResponse(200, "Profile updated successfully", updatedUser));
-});
-
 /* =====================================================
    VERIFY EMAIL
 ===================================================== */
@@ -207,15 +197,12 @@ const googleCallbackController = asyncHandler(async (req, res) => {
 
   const cleanupOAuthCookies = () => {
     res.clearCookie("oauthState", oauthCookieOptions);
-
     res.clearCookie("oauthCodeVerifier", oauthCookieOptions);
-
     res.clearCookie("oauthNonce", oauthCookieOptions);
   };
 
   if (error) {
     cleanupOAuthCookies();
-
     return res.redirect(`${clientUrl}/login?oauth=cancelled`);
   }
 
@@ -229,7 +216,6 @@ const googleCallbackController = asyncHandler(async (req, res) => {
 
   if (storedState.length !== state.length) {
     cleanupOAuthCookies();
-
     return res.redirect(`${clientUrl}/login?oauth=invalid`);
   }
 
@@ -237,7 +223,6 @@ const googleCallbackController = asyncHandler(async (req, res) => {
 
   if (!validState) {
     cleanupOAuthCookies();
-
     return res.redirect(`${clientUrl}/login?oauth=invalid`);
   }
 
@@ -260,7 +245,6 @@ const googleCallbackController = asyncHandler(async (req, res) => {
     });
 
     setAuthCookies(res, result);
-
     cleanupOAuthCookies();
 
     return res.redirect(`${clientUrl}/`);

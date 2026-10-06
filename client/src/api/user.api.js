@@ -50,3 +50,20 @@ export const getFollowing = async (userId) => {
 
   return data;
 }
+
+
+export const checkUsername = async (
+  username
+) => {
+  const params =
+    new URLSearchParams({
+      username,
+    });
+
+  const { data } =
+    await API.get(
+      `/users/check-username?${params.toString()}`
+    );
+
+  return data;
+};
