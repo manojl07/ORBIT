@@ -3,13 +3,11 @@ import { useQuery } from "@tanstack/react-query";
 import { useParams } from "react-router-dom";
 import { getUserProfile } from "../api/user.api";
 import { useAuth } from "../hooks/useAuth";
-import Loader from "../components/ui/Loader";
 import ProfileHeader from "../components/profile/ProfileHeader";
 import ProfilePostsGrid from "../components/profile/ProfilePostsGrid";
 import PostModal from "../components/post/PostModal";
 import EditProfileModal from "../components/profile/EditProfileModal";
-import SkeletonGrid from "../components/UI/SkeletonGrid";
-
+import ProfileSkeleton from "../components/profile/ProfileSkeleton";
 import useInfiniteUserPosts from "../hooks/useInfiniteUserPosts";
 import FeedEndTrigger from "../components/feed/FeedEndTrigger";
 import PostsEndState from '../components/post/PostsEndState'
@@ -46,15 +44,9 @@ const Profile = () => {
   /*==================================================
   LOADING
   ==================================================*/
-  if (isAuthLoading || profileLoading || postsLoading) {
-    return (
-      <div className="min-h-screen bg-black">
-        <div className="max-w-4xl mx-auto py-10">
-          <SkeletonGrid />
-        </div>
-      </div>
-    );
-  }
+if (isAuthLoading || profileLoading || postsLoading) {
+  return <ProfileSkeleton />;
+}
 
   /*==================================================
   ERROR

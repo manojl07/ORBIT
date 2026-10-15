@@ -103,3 +103,25 @@ export const deletePost = async (postId) => {
 
   return data;
 };
+
+export const getLikedPosts = async ({
+  page = 1,
+  limit = 12,
+} = {}) => {
+  const { data } = await API.get(
+    `/posts/liked?page=${page}&limit=${limit}`
+  );
+
+  return data;
+};
+
+export const getCommentedPosts = async ({
+  page = 1,
+  limit = 12,
+} = {}) => {
+  const { data } = await API.get(
+    `/posts/commented?page=${page}&limit=${limit}`
+  );
+
+  return data;
+};

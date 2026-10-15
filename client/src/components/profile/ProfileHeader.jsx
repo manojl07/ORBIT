@@ -294,7 +294,7 @@ const ProfileActions = ({
           className="inline-flex items-center justify-center gap-2 rounded-lg bg-zinc-800 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-zinc-700"
         >
           <Bookmark size={16} />
-          Saved posts
+          view archive's
         </Link>
 
         <button

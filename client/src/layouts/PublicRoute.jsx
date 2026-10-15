@@ -1,6 +1,6 @@
 import { Navigate } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth"
-import Loader from "../components/ui/Loader";
+import SkeletonCard from "../components/ui/SkeletonCard";
 
 
 const PublicRoute = ({ children }) => {
@@ -9,7 +9,7 @@ const PublicRoute = ({ children }) => {
 
   if (isAuthLoading) {
     return (
-      <Loader />
+      <SkeletonCard />
     )
   }
 

@@ -1,7 +1,7 @@
 import React from 'react'
 import { Navigate } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth'
-import Loader from '../components/ui/Loader';
+import SkeletonCard from '../components/ui/SkeletonCard';
 
 
 const ProtectedRoute = ({ children }) => {
@@ -9,7 +9,7 @@ const ProtectedRoute = ({ children }) => {
 
   if (isAuthLoading) {
     return (
-      <Loader />
+      <SkeletonCard />
     )
   }
 

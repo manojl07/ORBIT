@@ -4,6 +4,7 @@ const User = require("../models/user.model");
 const Like = require("../models/like.model");
 const ApiError = require("../utils/ApiError");
 const SavedPost = require("../models/savedPost.model");
+const Comment = require("../models/comment.model");
 
 
 const {
@@ -75,13 +76,29 @@ const deletePost = async (postId, userId) => {
     throw new ApiError(404, "Post not found");
   }
 
+  // Only the post owner can delete it.
   if (String(post.user) !== String(userId)) {
     throw new ApiError(403, "Unauthorized");
   }
 
+  // Delete the post document.
   await Post.findByIdAndDelete(postId);
-  await SavedPost.deleteMany({ post: postId });
 
+  // Remove related activity records.
+  try {
+    await Promise.all([
+      SavedPost.deleteMany({ post: postId }),
+      Like.deleteMany({ post: postId }),
+      Comment.deleteMany({ post: postId }),
+    ]);
+  } catch (error) {
+    console.error(
+      "Failed to clean up post activity references:",
+      error.message
+    );
+  }
+
+  // Delete the associated image from ImageKit.
   if (post.imageFileId) {
     try {
       await deleteImage(post.imageFileId);

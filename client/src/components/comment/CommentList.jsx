@@ -15,8 +15,6 @@ import {
   useAuth,
 } from "../../hooks/useAuth";
 
-import Loader from "../ui/Loader";
-
 import CommentItem from "./CommentItem";
 import { queryKeys } from "../../constants/queryKey";
 

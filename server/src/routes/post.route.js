@@ -27,6 +27,11 @@ const {
   getCommentsController,
 } = require("../controllers/comment.controller");
 
+const {
+  getLikedPostsController,
+  getCommentedPostsController,
+} = require("../controllers/activity.controller");
+
 /* =====================================================
    SAVED POSTS
 ===================================================== */
@@ -110,6 +115,22 @@ router.post(
 router.get(
   "/:postId/comments",
   getCommentsController
+);
+
+/* =====================================================
+   PRIVATE ACTIVITY COLLECTIONS
+===================================================== */
+
+router.get(
+  "/liked",
+  authMiddleware,
+  getLikedPostsController
+);
+
+router.get(
+  "/commented",
+  authMiddleware,
+  getCommentedPostsController
 );
 
 module.exports = router;

@@ -17,12 +17,12 @@ const Feed = () => {
   ================================= */
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-black py-10">
-        <div className="max-w-lg mx-auto space-y-5">
-          {[...Array(5)].map((_, index) => (
+      <div className="min-h-dvh w-full bg-black text-white">
+        <main className="mx-auto w-full max-w-2xl space-y-4 bg-black py-0 sm:px-4 sm:py-6">
+          {Array.from({ length: 3 }).map((_, index) => (
             <SkeletonCard key={index} />
           ))}
-        </div>
+        </main>
       </div>
     );
   }
