@@ -1,14 +1,18 @@
+
 const Post = require("../models/post.model");
 const User = require("../models/user.model");
+const Like = require("../models/like.model");
 const ApiError = require("../utils/ApiError");
 
-const { uploadImage, deleteImage, } = require("./image.service");
-
-const Like = require("../models/like.model");
+const {
+  uploadImage,
+  deleteImage,
+} = require("./image.service");
 
 /* =====================================================
    SANITIZE POST
 ===================================================== */
+
 const sanitizePost = (post) => ({
   id: post._id,
   _id: post._id,
@@ -18,7 +22,18 @@ const sanitizePost = (post) => ({
   isLiked: post.isLiked ?? false,
   commentsCount: post.commentsCount,
   isEdited: post.isEdited,
-  user: post.user,
+  user: post.user
+    ? {
+        id: post.user._id,
+        _id: post.user._id,
+        username: post.user.username,
+        profileImg: post.user.profileImg,
+        isVerified: Boolean(post.user.isVerified),
+        ...(typeof post.user.isFollowing === "boolean" && {
+          isFollowing: post.user.isFollowing,
+        }),
+      }
+    : null,
   createdAt: post.createdAt,
 });
 
@@ -26,12 +41,19 @@ const sanitizePost = (post) => ({
    CREATE POST
 ===================================================== */
 
-const createPost = async ({ caption, image, userId, }) => {
+const createPost = async ({
+  caption,
+  image,
+  userId,
+}) => {
   if (!image) {
     throw new ApiError(400, "Image is required");
   }
 
-  const uploadedImage = await uploadImage(image, "/orbit/post-images");
+  const uploadedImage = await uploadImage(
+    image,
+    "/orbit/post-images"
+  );
 
   const post = await Post.create({
     caption,
@@ -54,8 +76,7 @@ const deletePost = async (postId, userId) => {
     throw new ApiError(404, "Post not found");
   }
 
-  if (String(post.user) !== String(userId)
-  ) {
+  if (String(post.user) !== String(userId)) {
     throw new ApiError(403, "Unauthorized");
   }
 
@@ -65,7 +86,10 @@ const deletePost = async (postId, userId) => {
     try {
       await deleteImage(post.imageFileId);
     } catch (error) {
-      console.error("Failed to delete image from ImageKit:", error.message);
+      console.error(
+        "Failed to delete image from ImageKit:",
+        error.message
+      );
     }
   }
 
@@ -76,33 +100,53 @@ const deletePost = async (postId, userId) => {
    GET USER POSTS
 ===================================================== */
 
-const getUserPosts = async ({ userId, currentUserId, page = 1, limit = 12, }) => {
+const getUserPosts = async ({
+  userId,
+  currentUserId,
+  page = 1,
+  limit = 12,
+}) => {
   const skip = (page - 1) * limit;
 
-  const [posts, total, userLikes,] = await Promise.all([
-    Post.find({ user: userId, }).populate("user", "username profileImg").sort({ createdAt: -1, }).skip(skip).limit(limit).lean(),
-    Post.countDocuments({ user: userId, }),
-    Like.find({ user: currentUserId, }).select("post"),
+  const [posts, total, userLikes] = await Promise.all([
+    Post.find({ user: userId })
+      .populate(
+        "user",
+        "username profileImg isVerified"
+      )
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limit)
+      .lean(),
+
+    Post.countDocuments({ user: userId }),
+
+    Like.find({ user: currentUserId })
+      .select("post")
+      .lean(),
   ]);
 
-  /*
-   * Protect against orphaned posts.
-   * A post can exist while its referenced
-   * user document no longer exists.
-   */
+  // Exclude posts whose referenced author no longer exists.
   const validPosts = posts.filter((post) => post.user);
 
-  const likedPosts = new Set(userLikes.map((like) => like.post.toString()));
+  const likedPosts = new Set(
+    userLikes.map((like) => String(like.post))
+  );
 
   const formattedPosts = validPosts.map((post) => ({
     ...post,
-    isLiked: likedPosts.has(post._id.toString()),
-    user: { ...post.user, },
+    isLiked: likedPosts.has(String(post._id)),
+    user: { ...post.user },
   }));
 
   return {
     posts: formattedPosts.map(sanitizePost),
-    pagination: { page, limit, total, totalPages: Math.ceil(total / limit), },
+    pagination: {
+      page,
+      limit,
+      total,
+      totalPages: Math.ceil(total / limit),
+    },
   };
 };
 
@@ -110,45 +154,66 @@ const getUserPosts = async ({ userId, currentUserId, page = 1, limit = 12, }) =>
    GET FEED
 ===================================================== */
 
-const getFeed = async ({ page = 1, limit = 10, userId, }) => {
+const getFeed = async ({
+  page = 1,
+  limit = 10,
+  userId,
+}) => {
   const skip = (page - 1) * limit;
 
-  const [posts, total, userLikes,] = await Promise.all([
-    Post.find().populate("user", "username profileImg followers").sort({ createdAt: -1, }).skip(skip).limit(limit).lean(),
+  const [posts, total, userLikes] = await Promise.all([
+    Post.find()
+      .populate(
+        "user",
+        "username profileImg followers isVerified"
+      )
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limit)
+      .lean(),
+
     Post.countDocuments(),
-    Like.find({ user: userId, }).select("post"),
+
+    Like.find({ user: userId })
+      .select("post")
+      .lean(),
   ]);
 
-  const likedPosts = new Set(userLikes.map((like) => like.post.toString()));
+  const likedPosts = new Set(
+    userLikes.map((like) => String(like.post))
+  );
 
-  /*
-   * IMPORTANT:
-   *
-   * populate() returns null when the
-   * referenced User document does not exist.
-   *
-   * Never allow one orphaned post to crash
-   * the complete feed.
-   */
+  // Never let an orphaned post crash the whole feed.
   const validPosts = posts.filter((post) => post.user);
 
   const formattedPosts = validPosts.map((post) => {
-    const followers = Array.isArray(post.user.followers) ? post.user.followers : [];
+    const followers = Array.isArray(post.user.followers)
+      ? post.user.followers
+      : [];
 
     return {
       ...post,
-      isLiked:likedPosts.has(post._id.toString()),
+
+      isLiked: likedPosts.has(String(post._id)),
+
       user: {
         ...post.user,
-        isFollowing:followers.some((id) =>id.toString() ===String(userId)),
+
+        isFollowing: followers.some(
+          (id) => String(id) === String(userId)
+        ),
       },
     };
   });
 
   return {
-    posts:formattedPosts.map(sanitizePost),
-
-    pagination: {page,limit,total,totalPages:Math.ceil(total / limit),},
+    posts: formattedPosts.map(sanitizePost),
+    pagination: {
+      page,
+      limit,
+      total,
+      totalPages: Math.ceil(total / limit),
+    },
   };
 };
 
@@ -156,36 +221,53 @@ const getFeed = async ({ page = 1, limit = 10, userId, }) => {
    TOGGLE LIKE
 ===================================================== */
 
-const toggleLike = async (postId,userId) => {
+const toggleLike = async (postId, userId) => {
   const post = await Post.findById(postId);
 
   if (!post) {
-    throw new ApiError(404,"Post not found");
+    throw new ApiError(404, "Post not found");
   }
 
-  const existingLike =await Like.findOne({user: userId,post: postId,});
+  const existingLike = await Like.findOne({
+    user: userId,
+    post: postId,
+  });
 
   if (existingLike) {
     await Like.findByIdAndDelete(existingLike._id);
 
-    post.likesCount -= 1;
+    post.likesCount = Math.max(
+      0,
+      post.likesCount - 1
+    );
 
     await post.save();
 
-    return {liked: false,likesCount:post.likesCount,};
+    return {
+      liked: false,
+      likesCount: post.likesCount,
+    };
   }
 
-  await Like.create({user: userId,post: postId,});
+  await Like.create({
+    user: userId,
+    post: postId,
+  });
 
   post.likesCount += 1;
 
   await post.save();
 
-  return {liked: true,likesCount:post.likesCount,};
+  return {
+    liked: true,
+    likesCount: post.likesCount,
+  };
 };
 
-/* =====================================================
-   EXPORTS
-===================================================== */
-
-module.exports = {createPost,deletePost,getUserPosts,getFeed,toggleLike,};
+module.exports = {
+  createPost,
+  deletePost,
+  getUserPosts,
+  getFeed,
+  toggleLike,
+};
