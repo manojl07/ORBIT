@@ -158,6 +158,33 @@ const resetPasswordController = asyncHandler(async (req, res) => {
   return res.status(200).json(new ApiResponse(200, "Password reset successfully"));
 });
 
+const requestGooglePasswordSetupController = asyncHandler(
+  async (req, res) => {
+    const result = await authService.requestGooglePasswordSetup(
+      req.body.email
+    );
+
+    return res
+      .status(200)
+      .json(new ApiResponse(200, result.message));
+  }
+);
+
+const completeGooglePasswordSetupController = asyncHandler(
+  async (req, res) => {
+    await authService.completeGooglePasswordSetup({
+      token: req.body.token,
+      password: req.body.password,
+    });
+
+    clearAuthCookies(res);
+
+    return res
+      .status(200)
+      .json(new ApiResponse(200, "ORBIT password set up successfully"));
+  }
+);
+
 /* =====================================================
    GOOGLE START
 ===================================================== */
@@ -257,4 +284,20 @@ const googleCallbackController = asyncHandler(async (req, res) => {
   }
 });
 
-module.exports = { registerController, loginController, getMeController, refreshController, logoutController, logoutAllController, updateProfileController, verifyEmailController, resendVerificationController, forgotPasswordController, resetPasswordController, googleAuthController, googleCallbackController, };
+module.exports = {
+  registerController,
+  loginController,
+  getMeController,
+  refreshController,
+  logoutController,
+  logoutAllController,
+  updateProfileController,
+  verifyEmailController,
+  resendVerificationController,
+  forgotPasswordController,
+  resetPasswordController,
+  googleAuthController,
+  googleCallbackController,
+  requestGooglePasswordSetupController,
+  completeGooglePasswordSetupController,
+};

@@ -15,7 +15,7 @@ const { verifyRefreshToken, } = require("../utils/jwt");
 
 const { generateOneTimeToken, hashOneTimeToken, } = require("../utils/oneTimeToken");
 
-const { sendVerificationEmail, sendPasswordResetEmail, } = require("./email.service");
+const {sendVerificationEmail,sendPasswordResetEmail,sendGooglePasswordSetupEmail,} = require("./email.service");
 
 /* =====================================================
    USER SANITIZER
@@ -345,25 +345,32 @@ const resendVerification = async (email) => {
 const forgotPassword = async (email) => {
   const normalized = email.trim().toLowerCase();
 
-  const genericResponse = "If an account exists with that email, a password reset link has been sent.";
+  const genericResponse =
+    "If an account exists with that email, a password reset link has been sent.";
 
-  const user = await User.findOne({ email: normalized, });
+  const user = await User.findOne({
+    email: normalized,
+  }).select("+password");
 
-  if (!user) {
-    return {
-      message: genericResponse,
-    };
+  // Do not expose whether the account exists or whether it has a password.
+  if (!user || !user.password) {
+    return { message: genericResponse };
   }
 
-  const token = await createAuthToken({ userId: user._id, type: "passwordReset", expiresIn: 15 * 60 * 1000, });
+  const token = await createAuthToken({
+    userId: user._id,
+    type: "passwordReset",
+    expiresIn: 15 * 60 * 1000,
+  });
 
-  await sendPasswordResetEmail({ email: user.email, username: user.username, token, });
+  await sendPasswordResetEmail({
+    email: user.email,
+    username: user.username,
+    token,
+  });
 
-  return {
-    message: genericResponse,
-  };
+  return { message: genericResponse };
 };
-
 /* =====================================================
    RESET PASSWORD
 ===================================================== */
@@ -399,6 +406,93 @@ const resetPassword = async ({ token, password, }) => {
   return true;
 };
 
+const requestGooglePasswordSetup = async (email) => {
+  const normalized = email.trim().toLowerCase();
+
+  const genericResponse =
+    "If your verified Google account is eligible, a password setup email has been sent.";
+
+  const user = await User.findOne({
+    email: normalized,
+  }).select("+password +googleId");
+
+  // Always return the same message for ineligible or nonexistent accounts.
+  if (
+    !user ||
+    !user.googleId ||
+    user.password ||
+    !user.isVerified ||
+    !user.emailVerifiedAt
+  ) {
+    return { message: genericResponse };
+  }
+
+  const token = await createAuthToken({
+    userId: user._id,
+    type: "googlePasswordSetup",
+    expiresIn: 15 * 60 * 1000,
+  });
+
+  await sendGooglePasswordSetupEmail({
+    email: user.email,
+    username: user.username,
+    token,
+  });
+
+  return { message: genericResponse };
+};
+
+
+const completeGooglePasswordSetup = async ({ token, password }) => {
+  const tokenHash = hashOneTimeToken(token);
+
+  // Atomically consume the valid token so concurrent requests cannot
+  // successfully use the same token more than once.
+  const authToken = await AuthToken.findOneAndDelete({
+    tokenHash,
+    type: "googlePasswordSetup",
+    expiresAt: { $gt: new Date() },
+  });
+
+  if (!authToken) {
+    throw new ApiError(
+      400,
+      "Invalid, expired, or already-used password setup link",
+      "INVALID_PASSWORD_SETUP_TOKEN"
+    );
+  }
+
+  const user = await User.findById(authToken.user).select(
+    "+password +googleId"
+  );
+
+  if (
+    !user ||
+    !user.googleId ||
+    user.password ||
+    !user.isVerified ||
+    !user.emailVerifiedAt
+  ) {
+    throw new ApiError(
+      400,
+      "This account is not eligible for password setup",
+      "PASSWORD_SETUP_NOT_ALLOWED"
+    );
+  }
+
+  // The existing User pre-save hook hashes this password.
+  user.password = password;
+  await user.save();
+
+  // Credential setup is security-sensitive: revoke existing sessions
+  // and any outstanding authentication tokens for this account.
+  await Promise.all([
+    Session.deleteMany({ user: user._id }),
+    AuthToken.deleteMany({ user: user._id }),
+  ]);
+
+  return true;
+};
 /* =====================================================
    UPDATE PROFILE
 ===================================================== */
@@ -528,4 +622,19 @@ const updateProfile = async ({
   };
 };
 
-module.exports = { register, login, loginWithGoogle, getMe, refresh, logout, logoutAll, updateProfile, verifyEmail, resendVerification, forgotPassword, resetPassword, };
+module.exports = {
+  register,
+  login,
+  loginWithGoogle,
+  getMe,
+  refresh,
+  logout,
+  logoutAll,
+  updateProfile,
+  verifyEmail,
+  resendVerification,
+  forgotPassword,
+  resetPassword,
+  requestGooglePasswordSetup,
+  completeGooglePasswordSetup,
+};

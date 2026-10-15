@@ -1,211 +1,165 @@
 import { useState } from "react";
-import {
-  Link,
-  useNavigate,
-  useSearchParams,
-} from "react-router-dom";
-
-import {
-  useMutation,
-} from "@tanstack/react-query";
-
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
+import { Eye, EyeOff } from "lucide-react";
+import { useMutation } from "@tanstack/react-query";
 import toast from "react-hot-toast";
 
-import {
-  resetPassword,
-} from "../api/auth.api";
+import { resetPassword } from "../api/auth.api";
+
+const passwordRegex =
+  /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&]).{8,64}$/;
 
 const ResetPassword = () => {
-  const navigate =
-    useNavigate();
+  const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
 
-  const [
-    searchParams,
-  ] = useSearchParams();
+  const token = searchParams.get("token");
 
-  const token =
-    searchParams.get(
-      "token"
-    );
+  const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
-  const [
-    password,
-    setPassword,
-  ] = useState("");
+  const mutation = useMutation({
+    mutationFn: resetPassword,
 
-  const [
-    confirmPassword,
-    setConfirmPassword,
-  ] = useState("");
+    onSuccess: (response) => {
+      toast.success(response.message || "Password reset successfully");
 
-  const mutation =
-    useMutation({
-      mutationFn:
-        resetPassword,
+      navigate("/login", { replace: true });
+    },
 
-      onSuccess: (
-        response
-      ) => {
-        toast.success(
-          response.message ||
-            "Password reset successfully"
-        );
+    onError: (error) => {
+      toast.error(
+        error?.response?.data?.message ||
+          "Reset link is invalid or expired"
+      );
+    },
+  });
 
-        navigate("/login", {
-          replace: true,
-        });
-      },
+  const handleSubmit = (event) => {
+    event.preventDefault();
 
-      onError: (error) => {
-        toast.error(
-          error?.response?.data
-            ?.message ||
-            "Reset link is invalid or expired"
-        );
-      },
-    });
+    if (!token) {
+      toast.error("Reset token is missing");
+      return;
+    }
 
-  const handleSubmit =
-    (event) => {
-      event.preventDefault();
+    if (!passwordRegex.test(password)) {
+      toast.error(
+        "Use 8–64 characters with uppercase, lowercase, a number and a special character (@$!%*?&)"
+      );
+      return;
+    }
 
-      if (!token) {
-        toast.error(
-          "Reset token is missing"
-        );
+    if (password !== confirmPassword) {
+      toast.error("Passwords do not match");
+      return;
+    }
 
-        return;
-      }
-
-      if (password.length < 8) {
-        toast.error(
-          "Password must be at least 8 characters"
-        );
-
-        return;
-      }
-
-      if (
-        password !==
-        confirmPassword
-      ) {
-        toast.error(
-          "Passwords do not match"
-        );
-
-        return;
-      }
-
-      mutation.mutate({
-        token,
-        password,
-      });
-    };
+    // Confirmation is only for frontend validation.
+    mutation.mutate({ token, password });
+  };
 
   return (
-    <div className="min-h-screen bg-zinc-950 flex items-center justify-center px-4">
-
+    <div className="flex min-h-screen items-center justify-center bg-zinc-950 px-4 py-8">
       <form
         onSubmit={handleSubmit}
-        className="
-          w-full
-          max-w-md
-          rounded-2xl
-          border
-          border-zinc-800
-          bg-zinc-900
-          p-6
-          sm:p-8
-        "
+        autoComplete="on"
+        className="w-full max-w-md rounded-2xl border border-zinc-800 bg-zinc-900 p-6 sm:p-8"
       >
         <h1 className="text-2xl font-bold text-white">
           Reset Password
         </h1>
 
+        <p className="mt-2 text-sm text-zinc-400">
+          Choose a strong password for your ORBIT account.
+        </p>
+
         {!token && (
-          <p className="mt-3 text-red-400">
+          <p role="alert" className="mt-4 text-sm text-red-400">
             This reset link is missing or invalid.
           </p>
         )}
 
         <div className="mt-6 space-y-4">
+          <div>
+            <div className="relative">
+              <input
+                type={showPassword ? "text" : "password"}
+                value={password}
+                onChange={(event) => setPassword(event.target.value)}
+                placeholder="New password"
+                autoComplete="new-password"
+                required
+                aria-label="New password"
+                className="w-full rounded-lg bg-zinc-800 p-3 pr-12 text-white outline-none focus:ring-2 focus:ring-blue-600"
+              />
 
-          <input
-            type="password"
-            value={password}
-            onChange={(event) =>
-              setPassword(
-                event.target.value
-              )
-            }
-            placeholder="New password"
-            className="
-              w-full
-              rounded-lg
-              bg-zinc-800
-              p-3
-              text-white
-              outline-none
-              focus:ring-2
-              focus:ring-blue-600
-            "
-          />
+              <button
+                type="button"
+                onClick={() => setShowPassword((visible) => !visible)}
+                aria-label={showPassword ? "Hide password" : "Show password"}
+                aria-pressed={showPassword}
+                className="absolute inset-y-0 right-0 flex w-12 items-center justify-center text-zinc-400 transition hover:text-white"
+              >
+                {showPassword ? <EyeOff size={19} /> : <Eye size={19} />}
+              </button>
+            </div>
+          </div>
 
-          <input
-            type="password"
-            value={
-              confirmPassword
-            }
-            onChange={(event) =>
-              setConfirmPassword(
-                event.target.value
-              )
-            }
-            placeholder="Confirm new password"
-            className="
-              w-full
-              rounded-lg
-              bg-zinc-800
-              p-3
-              text-white
-              outline-none
-              focus:ring-2
-              focus:ring-blue-600
-            "
-          />
+          <div>
+            <div className="relative">
+              <input
+                type={showConfirmPassword ? "text" : "password"}
+                value={confirmPassword}
+                onChange={(event) => setConfirmPassword(event.target.value)}
+                placeholder="Confirm new password"
+                autoComplete="new-password"
+                required
+                aria-label="Confirm new password"
+                className="w-full rounded-lg bg-zinc-800 p-3 pr-12 text-white outline-none focus:ring-2 focus:ring-blue-600"
+              />
+
+              <button
+                type="button"
+                onClick={() =>
+                  setShowConfirmPassword((visible) => !visible)
+                }
+                aria-label={
+                  showConfirmPassword
+                    ? "Hide confirm password"
+                    : "Show confirm password"
+                }
+                aria-pressed={showConfirmPassword}
+                className="absolute inset-y-0 right-0 flex w-12 items-center justify-center text-zinc-400 transition hover:text-white"
+              >
+                {showConfirmPassword ? (
+                  <EyeOff size={19} />
+                ) : (
+                  <Eye size={19} />
+                )}
+              </button>
+            </div>
+          </div>
+
+          <p className="text-xs leading-5 text-zinc-500">
+            Passwords must be 8–64 characters and include uppercase and
+            lowercase letters, a number, and one of @$!%*?&.
+          </p>
 
           <button
             type="submit"
-            disabled={
-              mutation.isPending ||
-              !token
-            }
-            className="
-              w-full
-              rounded-lg
-              bg-blue-600
-              py-3
-              font-semibold
-              text-white
-              hover:bg-blue-500
-              disabled:opacity-50
-            "
+            disabled={mutation.isPending || !token}
+            className="w-full rounded-lg bg-blue-600 py-3 font-semibold text-white transition hover:bg-blue-500 disabled:cursor-not-allowed disabled:opacity-50"
           >
-            {mutation.isPending
-              ? "Resetting..."
-              : "Reset Password"}
+            {mutation.isPending ? "Resetting..." : "Reset Password"}
           </button>
         </div>
 
         <Link
           to="/login"
-          className="
-            mt-5
-            block
-            text-center
-            text-sm
-            text-blue-500
-          "
+          className="mt-5 block text-center text-sm text-blue-500 hover:text-blue-400"
         >
           Back to Login
         </Link>

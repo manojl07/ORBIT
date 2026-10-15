@@ -12,6 +12,9 @@ import ProtectedRoute from "../layouts/ProtectedRoute";
 import PublicRoute from "../layouts/PublicRoute";
 import MainLayout from "../layouts/MainLayout";
 
+import RequestGooglePasswordSetup from "../pages/RequestGooglePasswordSetup";
+import SetupPassword from "../pages/SetupPassword";
+
 import {
   Route,
   Routes,
@@ -55,6 +58,20 @@ const AppRoutes = () => {
         element={
           <ResetPassword />
         }
+      />
+
+      <Route
+        path="/setup-password/request"
+        element={
+          <PublicRoute>
+            <RequestGooglePasswordSetup />
+          </PublicRoute>
+        }
+      />
+
+      <Route
+        path="/setup-password"
+        element={<SetupPassword />}
       />
 
       <Route

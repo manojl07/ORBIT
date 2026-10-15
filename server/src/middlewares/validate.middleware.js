@@ -10,16 +10,27 @@ const getValidationMessage = (result) => {
   return issues.map((issue) => issue.message).join(", ");
 };
 
+
 const validate = (schema) => {
   return (req, res, next) => {
     const result = schema.safeParse(req.body);
 
-    if (!result.success) return next(new ApiError(400,getValidationMessage(result)));
-  
+    if (!result.success) {
+      const issues = result.error.issues ?? result.error.errors ?? [];
+
+      return next(
+        new ApiError(
+          400,
+          issues.map((issue) => issue.message).join(", ")
+        )
+      );
+    }
+
     req.body = result.data;
-    next();
+    return next();
   };
 };
+
 
 const validateQuery = (schema) => {
   return (req, res, next) => {

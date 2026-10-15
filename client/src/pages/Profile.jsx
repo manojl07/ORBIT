@@ -78,7 +78,7 @@ const Profile = () => {
   ==================================================*/
   return (
     <div className="min-h-screen bg-black">
-      <div className="max-w-4xl mx-auto">
+      <div className="mx-auto w-full max-w-5xl">
         {/* PROFILE HEADER */}
         <ProfileHeader user={profileUser} isOwnProfile={String(profileId) === String(user.id)} onEditProfile={() => setIsEditOpen(true)} />
         {/* POSTS */}

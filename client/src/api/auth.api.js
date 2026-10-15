@@ -137,3 +137,21 @@ export const resetPassword =
 
     return data;
   };
+
+  export const requestGooglePasswordSetup = async (email) => {
+  const { data } = await API.post(
+    "/auth/google-password-setup/request",
+    { email }
+  );
+
+  return data;
+};
+
+export const completeGooglePasswordSetup = async ({ token, password }) => {
+  const { data } = await API.post(
+    "/auth/google-password-setup/complete",
+    { token, password }
+  );
+
+  return data;
+};
