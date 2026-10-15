@@ -1,38 +1,47 @@
-import React, { useEffect, useRef } from 'react'
+import { useEffect, useRef } from "react";
 
-const FeedEndTrigger = ({hasNextPage, isFetchingNextPage, fetchNextPage}) => {
-
+const FeedEndTrigger = ({
+  hasNextPage,
+  isFetchingNextPage,
+  fetchNextPage,
+}) => {
   const observerRef = useRef(null);
 
   useEffect(() => {
-    if(!hasNextPage) return;
-
-    const observer = new IntersectionObserver(([entry]) => {
-      if(entry.isIntersecting && !isFetchingNextPage){
-        fetchNextPage();
-      }
-    }, {
-      root: null, rootMargin: "250px", threshold: 0,
-    })
+    // No more pages to load.
+    if (!hasNextPage) return;
 
     const current = observerRef.current;
 
-    if(current) { 
-      observer.observe(current);
-    }
+    if (!current) return;
 
-    return () => {
-      if(current){
-        observer.unobserve(current);
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting && !isFetchingNextPage) {
+          fetchNextPage();
+        }
+      },
+      {
+        root: null,
+        rootMargin: "250px",
+        threshold: 0,
       }
-      observer.disconnect()
-    }
-  }, [fetchNextPage, hasNextPage, isFetchingNextPage])
-  
+    );
 
-  return (
-    <div ref={observerRef} className='h-1 w-full'></div>
-  )
-}
+    observer.observe(current);
 
-export default FeedEndTrigger
+    // Clean up the observer when the component
+    // unmounts or its dependencies change.
+    return () => {
+      observer.disconnect();
+    };
+  }, [
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+  ]);
+
+  return <div ref={observerRef} className="h-1 w-full" />;
+};
+
+export default FeedEndTrigger;

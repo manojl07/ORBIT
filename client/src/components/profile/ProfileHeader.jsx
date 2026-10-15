@@ -5,6 +5,8 @@ import {
   Pencil,
   Settings,
 } from "lucide-react";
+import { Link } from "react-router-dom";
+import { Bookmark } from "lucide-react";
 
 import FollowersModal from "../social/FollowersModal";
 import FollowingModal from "../social/FollowingModal";
@@ -135,12 +137,13 @@ const ProfileHeader = ({
                     <span>Edit profile</span>
                   </button>
 
-                  <button
-                    type="button"
-                    className="flex h-10 items-center justify-center rounded-lg bg-zinc-800 text-sm font-semibold text-white transition hover:bg-zinc-700 active:scale-[0.98]"
+                  <Link
+                    to="/saved"
+                    className="flex h-10 items-center justify-center gap-2 rounded-lg bg-zinc-800 px-3 text-sm font-semibold text-white transition hover:bg-zinc-700 active:scale-[0.98]"
                   >
-                    View archive
-                  </button>
+                    <Bookmark size={16} />
+                    <span>Saved</span>
+                  </Link>
 
                   <button
                     type="button"
@@ -236,9 +239,8 @@ const MutualFriends = ({ mutualFriends }) => {
             src={friend.profileImg}
             alt={friend.username}
             title={friend.username}
-            className={`h-7 w-7 rounded-full border-2 border-black object-cover ${
-              index > 0 ? "-ml-2" : ""
-            }`}
+            className={`h-7 w-7 rounded-full border-2 border-black object-cover ${index > 0 ? "-ml-2" : ""
+              }`}
           />
         ))}
       </div>
@@ -287,12 +289,13 @@ const ProfileActions = ({
           Edit profile
         </button>
 
-        <button
-          type="button"
-          className="rounded-lg bg-zinc-800 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-zinc-700"
+        <Link
+          to="/saved"
+          className="inline-flex items-center justify-center gap-2 rounded-lg bg-zinc-800 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-zinc-700"
         >
-          View archive
-        </button>
+          <Bookmark size={16} />
+          Saved posts
+        </Link>
 
         <button
           type="button"

@@ -1,27 +1,115 @@
-const express = require('express')
+const express = require("express");
+
 const router = express.Router();
 
-const authMiddleware = require('../middlewares/auth.middleware')
-const upload = require('../middlewares/upload.middleware')
-const validate = require('../middlewares/validate.middleware')
+const authMiddleware = require("../middlewares/auth.middleware");
+const upload = require("../middlewares/upload.middleware");
+const validate = require("../middlewares/validate.middleware");
 
-const { createPostSchema } = require('../validators/post.validator')
+const { createPostSchema } = require("../validators/post.validator");
 
-const { createPostController, deletePostController, getUserPostsController, getFeedController, toggleLikeController } = require("../controllers/post.controller");
-const { createCommentController, getCommentsController } = require('../controllers/comment.controller');
+const {
+  createPostController,
+  deletePostController,
+  getUserPostsController,
+  getFeedController,
+  toggleLikeController,
+} = require("../controllers/post.controller");
 
-router.post('/', authMiddleware, upload.single('image'), validate(createPostSchema), createPostController)
+const {
+  savePostController,
+  unsavePostController,
+  getSavedPostsController,
+} = require("../controllers/savedPost.controller");
 
-router.delete('/:id', authMiddleware, deletePostController);
+const {
+  createCommentController,
+  getCommentsController,
+} = require("../controllers/comment.controller");
 
-router.get('/user/:userId', authMiddleware, getUserPostsController)
+/* =====================================================
+   SAVED POSTS
+===================================================== */
 
-router.get('/feed', authMiddleware, getFeedController)
+router.get(
+  "/saved",
+  authMiddleware,
+  getSavedPostsController
+);
 
-router.post('/:postId/like', authMiddleware, toggleLikeController)
+/* =====================================================
+   CREATE / DELETE POSTS
+===================================================== */
 
-router.post('/:postId/comments', authMiddleware, createCommentController);
+router.post(
+  "/",
+  authMiddleware,
+  upload.single("image"),
+  validate(createPostSchema),
+  createPostController
+);
 
-router.get('/:postId/comments', getCommentsController);
+router.delete(
+  "/:id",
+  authMiddleware,
+  deletePostController
+);
+
+/* =====================================================
+   USER POSTS / FEED
+===================================================== */
+
+router.get(
+  "/user/:userId",
+  authMiddleware,
+  getUserPostsController
+);
+
+router.get(
+  "/feed",
+  authMiddleware,
+  getFeedController
+);
+
+/* =====================================================
+   LIKE
+===================================================== */
+
+router.post(
+  "/:postId/like",
+  authMiddleware,
+  toggleLikeController
+);
+
+/* =====================================================
+   SAVE / UNSAVE
+===================================================== */
+
+router.put(
+  "/:postId/save",
+  authMiddleware,
+  savePostController
+);
+
+router.delete(
+  "/:postId/save",
+  authMiddleware,
+  unsavePostController
+);
+
+/* =====================================================
+   COMMENTS
+===================================================== */
+
+router.post(
+  "/:postId/comments",
+  authMiddleware,
+  createCommentController
+);
+
+router.get(
+  "/:postId/comments",
+  getCommentsController
+);
 
 module.exports = router;

@@ -15,6 +15,8 @@ import MainLayout from "../layouts/MainLayout";
 import RequestGooglePasswordSetup from "../pages/RequestGooglePasswordSetup";
 import SetupPassword from "../pages/SetupPassword";
 
+import SavedPosts from "../pages/SavedPosts";
+
 import {
   Route,
   Routes,
@@ -115,6 +117,17 @@ const AppRoutes = () => {
           <ProtectedRoute>
             <MainLayout>
               <Profile />
+            </MainLayout>
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/saved"
+        element={
+          <ProtectedRoute>
+            <MainLayout>
+              <SavedPosts />
             </MainLayout>
           </ProtectedRoute>
         }

@@ -1,64 +1,152 @@
-import { useMutation, useQueryClient, } from "@tanstack/react-query";
 
-import { useAuth } from "./useAuth";
-
-import { updateProfile, } from "../api/auth.api";
-
-import { queryKeys, } from "../constants/queryKey";
+import {
+  useMutation,
+  useQueryClient,
+} from "@tanstack/react-query";
 
 import toast from "react-hot-toast";
 
-const useUpdateProfile = (onSuccessCallback) => {
-  const queryClient = useQueryClient();
+import {
+  savePost,
+  unsavePost,
+} from "../api/post.api";
 
-  const { setUser } = useAuth();
+import { queryKeys } from "../constants/queryKey";
 
-  return useMutation({
-    mutationFn: updateProfile,
-    onSuccess: (response) => {
-      const updatedUser = response.data;
+/* =====================================================
+   UPDATE POST STATE INSIDE A CACHED RESPONSE
+===================================================== */
 
-      /* ========================================
-         UPDATE GLOBAL AUTH USER
-      ======================================== */
-      setUser(updatedUser);
+const updatePostSavedState = (data, postId, isSaved) => {
+  if (!data || typeof data !== "object") {
+    return data;
+  }
 
-      /* ========================================
-         UPDATE CURRENT PROFILE IMMEDIATELY
-      ======================================== */
-      queryClient.setQueryData(queryKeys.profile(updatedUser.id), (oldData) => {
-        if (!oldData) {
-          return oldData;
-        }
+  // Infinite-query structure.
+  if (Array.isArray(data.pages)) {
+    return {
+      ...data,
+      pages: data.pages.map((page) =>
+        updatePostSavedState(page, postId, isSaved)
+      ),
+    };
+  }
 
-        return {
-          ...oldData,
+  const updatePosts = (posts) =>
+    posts.map((post) => {
+      const id = post?._id ?? post?.id;
 
-          data: {
-            ...oldData.data,
-            ...updatedUser,
-          },
-        };
-      }
-      );
+      return String(id) === String(postId)
+        ? { ...post, isSaved }
+        : post;
+    });
 
-      /* ========================================
-         REFRESH DEPENDENT DATA
-      ======================================== */
-      queryClient.invalidateQueries({ queryKey: queryKeys.userPosts(updatedUser.id), });
-      queryClient.invalidateQueries({ queryKey: queryKeys.feed, });
-      queryClient.invalidateQueries({ queryKey: queryKeys.followers(updatedUser.id), });
-      queryClient.invalidateQueries({ queryKey: queryKeys.following(updatedUser.id), });
-      queryClient.invalidateQueries({ queryKey: ["search-users",], });
-      toast.success("Profile updated 🚀");
+  // API response: { data: { posts, pagination } }
+  if (Array.isArray(data.data?.posts)) {
+    return {
+      ...data,
+      data: {
+        ...data.data,
+        posts: updatePosts(data.data.posts),
+      },
+    };
+  }
 
-      onSuccessCallback?.();
-    },
+  // Direct response: { posts, pagination }
+  if (Array.isArray(data.posts)) {
+    return {
+      ...data,
+      posts: updatePosts(data.posts),
+    };
+  }
 
-    onError: (error) => {
-      toast.error(error.response?.data?.message || "Failed to update profile");
-    },
-  });
+  return data;
 };
 
-export default useUpdateProfile;
+/* =====================================================
+   SAVE / UNSAVE HOOK
+===================================================== */
+
+const useSavePost = ({ post }) => {
+  const queryClient = useQueryClient();
+
+  const postId = post?._id ?? post?.id;
+
+  const mutation = useMutation({
+    mutationFn: ({ id, shouldSave }) =>
+      shouldSave ? savePost(id) : unsavePost(id),
+
+    onMutate: async ({ id, shouldSave }) => {
+      await Promise.all([
+        queryClient.cancelQueries({
+          queryKey: queryKeys.feed,
+        }),
+        queryClient.cancelQueries({
+          queryKey: ["user-posts"],
+        }),
+      ]);
+
+      const snapshots = [
+        ...queryClient.getQueriesData({
+          queryKey: queryKeys.feed,
+        }),
+        ...queryClient.getQueriesData({
+          queryKey: ["user-posts"],
+        }),
+      ];
+
+      for (const [queryKey] of snapshots) {
+        queryClient.setQueryData(queryKey, (oldData) =>
+          updatePostSavedState(oldData, id, shouldSave)
+        );
+      }
+
+      return { snapshots };
+    },
+
+    onSuccess: (_response, variables) => {
+      toast.success(
+        variables.shouldSave
+          ? "Post saved"
+          : "Removed from saved posts"
+      );
+    },
+
+    onError: (error, _variables, context) => {
+      // Restore the exact previous cache for each affected query.
+      context?.snapshots?.forEach(([queryKey, oldData]) => {
+        queryClient.setQueryData(queryKey, oldData);
+      });
+
+      toast.error(
+        error?.response?.data?.message ||
+          "Failed to update saved post"
+      );
+    },
+
+    onSettled: async () => {
+      await queryClient.invalidateQueries({
+        queryKey: queryKeys.savedPosts,
+      });
+    },
+  });
+
+  const toggleSaved = () => {
+    if (!postId || mutation.isPending) {
+      return;
+    }
+
+    mutation.mutate({
+      id: postId,
+      shouldSave: !Boolean(post?.isSaved),
+    });
+  };
+
+  return {
+    toggleSaved,
+    isPending: mutation.isPending,
+    isSaved: Boolean(post?.isSaved),
+  };
+};
+
+export default useSavePost;
