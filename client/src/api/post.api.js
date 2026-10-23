@@ -36,7 +36,10 @@ export const getUserPosts = async ({
 ===================================================== */
 
 export const createPost = async (formData) => {
-  const { data } = await API.post("/posts", formData);
+  const { data } = await API.post(
+    "/posts",
+    formData
+  );
 
   return data;
 };
@@ -93,16 +96,8 @@ export const getSavedPosts = async ({
 };
 
 /* =====================================================
-   DELETE POST
+   GET LIKED POSTS
 ===================================================== */
-
-export const deletePost = async (postId) => {
-  const { data } = await API.delete(
-    `/posts/${postId}`
-  );
-
-  return data;
-};
 
 export const getLikedPosts = async ({
   page = 1,
@@ -115,12 +110,28 @@ export const getLikedPosts = async ({
   return data;
 };
 
+/* =====================================================
+   GET COMMENTED POSTS
+===================================================== */
+
 export const getCommentedPosts = async ({
   page = 1,
   limit = 12,
 } = {}) => {
   const { data } = await API.get(
     `/posts/commented?page=${page}&limit=${limit}`
+  );
+
+  return data;
+};
+
+/* =====================================================
+   DELETE POST
+===================================================== */
+
+export const deletePost = async (postId) => {
+  const { data } = await API.delete(
+    `/posts/${postId}`
   );
 
   return data;

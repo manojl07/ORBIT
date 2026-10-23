@@ -1,148 +1,119 @@
-import React from "react";
-
 import {
   useMutation,
   useQuery,
   useQueryClient,
 } from "@tanstack/react-query";
 
+import toast from "react-hot-toast";
+
 import {
   deleteComment,
   getComments,
 } from "../../api/comment.api";
 
-import {
-  useAuth,
-} from "../../hooks/useAuth";
-
+import { useAuth } from "../../hooks/useAuth";
 import CommentItem from "./CommentItem";
 import { queryKeys } from "../../constants/queryKey";
 
-import SkeletonComments from "../UI/SkeletonComments";
-import EmptyState from "../UI/EmptyState";
+import SkeletonComments from "../ui/SkeletonComments";
+import EmptyState from "../ui/EmptyState";
 
-
-const CommentList = ({
-  postId,
-  queryKey,
-}) => {
-
+const CommentList = ({ postId, queryKey }) => {
   const { user } = useAuth();
-
   const queryClient = useQueryClient();
 
-
-  // ========================================
-  // GET COMMENTS
-  // ========================================
-
+  // Fetch comments for this post.
   const {
     data,
     isLoading,
     isError,
   } = useQuery({
     queryKey,
-
-    queryFn: () =>
-      getComments(postId),
-
-    enabled: !!postId,
+    queryFn: () => getComments(postId),
+    enabled: Boolean(postId),
   });
 
-
-  // ========================================
-  // DELETE COMMENT
-  // ========================================
-
+  // Delete a specific comment.
   const deleteMutation = useMutation({
+    mutationFn: (commentId) => deleteComment(commentId),
 
-    mutationFn: deleteComment,
+    onSuccess: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey }),
+        queryClient.invalidateQueries({
+          queryKey: queryKeys.feed,
+        }),
+        queryClient.invalidateQueries({
+          queryKey: ["user-posts"],
+        }),
+        queryClient.invalidateQueries({
+          queryKey: ["commented-posts"],
+        }),
+      ]);
 
-    onSuccess: () => {
-
-      // Refresh comments
-      queryClient.invalidateQueries({
-        queryKey,
-      });
-
-
-      // Refresh feed comment counts
-      queryClient.invalidateQueries({
-        queryKey: queryKeys.feed,
-      });
-
-
-      // Refresh profile comment counts
-      queryClient.invalidateQueries({
-        queryKey: ["user-posts"],
-      });
-
+      toast.success("Comment deleted");
     },
 
+    onError: (error) => {
+      toast.error(
+        error?.response?.data?.message ||
+          "Failed to delete comment"
+      );
+    },
   });
 
-
-  // ========================================
-  // LOADING
-  // ========================================
-
-if (isLoading) {
-  return <SkeletonComments />;
-}
-
-
-  // ========================================
-  // ERROR
-  // ========================================
+  if (isLoading) {
+    return <SkeletonComments />;
+  }
 
   if (isError) {
     return (
-      <p className="text-red-400 text-center py-6">
+      <p className="py-6 text-center text-sm text-red-400">
         Failed to load comments.
       </p>
     );
   }
 
+  const comments = data?.data ?? [];
 
-  // ========================================
-  // EMPTY
-  // ========================================
+  if (comments.length === 0) {
+    return (
+      <EmptyState
+        icon="💬"
+        title="No Comments Yet"
+        description="Start the conversation."
+      />
+    );
+  }
 
-if (!data?.data?.length) {
+  const handleDelete = (commentId) => {
+    // Prevent another deletion while this one is pending.
+    if (deleteMutation.isPending) return;
+
+    deleteMutation.mutate(commentId);
+  };
+
   return (
-    <EmptyState
-      icon="💬"
-      title="No Comments Yet"
-      description="Start the conversation."
-    />
-  );
-}
+    <div className="px-4 py-2">
+      {comments.map((comment) => {
+        const isDeletingThisComment =
+          deleteMutation.isPending &&
+          String(deleteMutation.variables) ===
+            String(comment.id);
 
-
-  // ========================================
-  // COMMENTS
-  // ========================================
-
-  return (
-    <div className="p-4">
-
-      {data.data.map((comment) => (
-
-        <CommentItem
-          key={comment.id}
-          comment={comment}
-          currentUserId={user?.id}
-          deleting={deleteMutation.isPending}
-          onDelete={(commentId) =>
-            deleteMutation.mutate(commentId)
-          }
-        />
-
-      ))}
-
+        return (
+          <CommentItem
+            key={comment.id}
+            comment={comment}
+            currentUserId={user?.id ?? user?._id}
+            deleting={isDeletingThisComment}
+            deleteDisabled={deleteMutation.isPending}
+            onDelete={handleDelete}
+          />
+        );
+      })}
     </div>
   );
 };
-
 
 export default CommentList;

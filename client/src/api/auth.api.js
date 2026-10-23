@@ -4,14 +4,8 @@ import API from "./axios";
    REGISTER
 ===================================================== */
 
-export const registerUser =
-  async (formData) => {
-    const { data } =
-      await API.post(
-        "/auth/register",
-        formData
-      );
-
+export const registerUser =async (formData) => {
+    const { data } =await API.post("/auth/register",formData);
     return data;
   };
 
@@ -19,14 +13,8 @@ export const registerUser =
    LOGIN
 ===================================================== */
 
-export const loginUser =
-  async (body) => {
-    const { data } =
-      await API.post(
-        "/auth/login",
-        body
-      );
-
+export const loginUser =async (body) => {
+    const { data } =await API.post("/auth/login",body);
     return data;
   };
 
@@ -35,9 +23,7 @@ export const loginUser =
 ===================================================== */
 
 export const getMe = async () => {
-  const { data } =
-    await API.get("/auth/me");
-
+  const { data } =await API.get("/auth/me");
   return data;
 };
 
@@ -45,23 +31,13 @@ export const getMe = async () => {
    LOGOUT
 ===================================================== */
 
-export const logoutUser =
-  async () => {
-    const { data } =
-      await API.post(
-        "/auth/logout"
-      );
-
+export const logoutUser =async () => {
+    const { data } =await API.post("/auth/logout");
     return data;
   };
 
-export const logoutAllDevices =
-  async () => {
-    const { data } =
-      await API.post(
-        "/auth/logout-all"
-      );
-
+export const logoutAllDevices =async () => {
+    const { data } =await API.post("/auth/logout-all");
     return data;
   };
 
@@ -69,14 +45,8 @@ export const logoutAllDevices =
    PROFILE
 ===================================================== */
 
-export const updateProfile =
-  async (formData) => {
-    const { data } =
-      await API.patch(
-        "/auth/profile",
-        formData
-      );
-
+export const updateProfile =async (formData) => {
+    const { data } =await API.patch("/auth/profile",formData);
     return data;
   };
 
@@ -84,25 +54,13 @@ export const updateProfile =
    EMAIL VERIFICATION
 ===================================================== */
 
-export const verifyEmail =
-  async (token) => {
-    const { data } =
-      await API.post(
-        "/auth/verify-email",
-        { token }
-      );
-
+export const verifyEmail =async (token) => {
+    const { data } =await API.post("/auth/verify-email",{ token });
     return data;
   };
 
-export const resendVerification =
-  async (email) => {
-    const { data } =
-      await API.post(
-        "/auth/resend-verification",
-        { email }
-      );
-
+export const resendVerification =async (email) => {
+    const { data } =await API.post("/auth/resend-verification",{ email });
     return data;
   };
 
@@ -110,48 +68,26 @@ export const resendVerification =
    PASSWORD RECOVERY
 ===================================================== */
 
-export const forgotPassword =
-  async (email) => {
-    const { data } =
-      await API.post(
-        "/auth/forgot-password",
-        { email }
-      );
-
+export const forgotPassword =async (email) => {
+    const { data } =await API.post("/auth/forgot-password",{ email });
     return data;
   };
 
-export const resetPassword =
-  async ({
-    token,
-    password,
-  }) => {
-    const { data } =
-      await API.post(
-        "/auth/reset-password",
-        {
-          token,
-          password,
-        }
-      );
-
+export const resetPassword =async ({token,password,}) => {
+    const { data } =await API.post("/auth/reset-password",{token,password,});
     return data;
   };
 
-  export const requestGooglePasswordSetup = async (email) => {
-  const { data } = await API.post(
-    "/auth/google-password-setup/request",
-    { email }
-  );
+/* =====================================================
+   GOOGLE PASSWORD SETUP
+===================================================== */
 
-  return data;
-};
+export const requestGooglePasswordSetup =async () => {
+    const { data } =await API.post("/auth/google/password-setup");
+    return data;
+  };
 
-export const completeGooglePasswordSetup = async ({ token, password }) => {
-  const { data } = await API.post(
-    "/auth/google-password-setup/complete",
-    { token, password }
-  );
-
-  return data;
-};
+export const completeGooglePasswordSetup =async ({token,password,}) => {
+    const { data } =await API.post("/auth/google/password-setup/complete",{token,password,});
+    return data;
+  };

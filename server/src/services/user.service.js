@@ -1,4 +1,3 @@
-
 const User = require("../models/user.model");
 const Post = require("../models/post.model");
 const ApiError = require("../utils/ApiError");
@@ -6,142 +5,94 @@ const ApiError = require("../utils/ApiError");
 /* =====================================================
    SANITIZE USER PROFILE
 ===================================================== */
-
 const sanitizeUserProfile = (user, extras = {}) => ({
   id: user._id,
   username: user.username,
   bio: user.bio,
   profileImg: user.profileImg,
   isVerified: Boolean(user.isVerified),
-  followersCount: user.followers?.length ?? 0,
-  followingCount: user.following?.length ?? 0,
+  followersCount: user.followers.length,
+  followingCount: user.following.length,
   ...extras,
 });
 
 /* =====================================================
-   GET PUBLIC PROFILE + MUTUAL CONNECTIONS
+   GET USER PROFILE
 ===================================================== */
+const getUserProfile = async ({profileUserId,currentUserId,}) => {
+  const [user, postsCount, currentUser] = await Promise.all([
+    User.findById(profileUserId),
+    Post.countDocuments({ user: profileUserId }),
+    User.findById(currentUserId)
+      .select("following")
+      .lean(),
+  ]);
 
-const getUserProfile = async ({
-  profileUserId,
-  currentUserId,
-}) => {
-  const [profileUser, postsCount, currentUser] =
-    await Promise.all([
-      User.findById(profileUserId)
-        .select(
-          "username bio profileImg followers following isVerified"
-        )
-        .lean(),
-
-      Post.countDocuments({
-        user: profileUserId,
-      }),
-
-      currentUserId
-        ? User.findById(currentUserId)
-            .select("following")
-            .lean()
-        : null,
-    ]);
-
-  if (!profileUser) {
+  if (!user) {
     throw new ApiError(404, "User not found");
   }
 
-  const isOwnProfile =
-    String(profileUser._id) === String(currentUserId);
+  // IDs of everyone the current user follows.
+  const currentFollowingIds = new Set((currentUser?.following ?? []).map((id) => String(id))
+  );
 
-  let mutualFriends = {
-    count: 0,
-    users: [],
-  };
-
-  if (!isOwnProfile && currentUser) {
-    // Accounts the current viewer follows.
-    const viewerFollowing = new Set(
-      (currentUser.following ?? []).map(String)
-    );
-
-    // Accounts that follow the profile being viewed.
-    const profileFollowers = profileUser.followers ?? [];
-
-    // Their intersection is the mutual connection set.
-    const mutualIds = profileFollowers
-      .filter((id) => viewerFollowing.has(String(id)))
-      .map(String);
-
-    // Fetch only a few public previews for the UI.
-    const previewIds = mutualIds.slice(0, 3);
-
-    const mutualUsers = previewIds.length
-      ? await User.find({
-          _id: { $in: previewIds },
-        })
-          .select("username profileImg")
-          .lean()
-      : [];
-
-    mutualFriends = {
-      count: mutualIds.length,
-      users: mutualUsers.map((mutualUser) => ({
-        id: mutualUser._id,
-        username: mutualUser.username,
-        profileImg: mutualUser.profileImg,
-      })),
-    };
-  }
-
-  return sanitizeUserProfile(profileUser, {
-    postsCount,
-    isOwnProfile,
-    isFollowing: (profileUser.followers ?? []).some(
-      (id) => String(id) === String(currentUserId)
+  // Find users who follow this profile AND are followed
+  // by the currently logged-in user.
+  const mutualIds = [
+    ...new Set(
+      user.followers
+        .map((id) => String(id))
+        .filter((id) => currentFollowingIds.has(id))
     ),
-    mutualFriends,
+  ];
+
+  // Only retrieve a small number of user previews.
+  const mutualUsers = await User.find({
+    _id: { $in: mutualIds },
+  })
+    .select("username profileImg")
+    .limit(3)
+    .lean();
+
+  return sanitizeUserProfile(user, {
+    postsCount,
+    isOwnProfile:String(user._id) === String(currentUserId),
+    isFollowing: user.followers.some((id) => String(id) === String(currentUserId)),
+
+    // New data required by ProfileHeader.jsx.
+    mutualFriends: {
+      count: mutualIds.length,
+      users: mutualUsers.map((friend) => ({
+        id: String(friend._id),
+        username: friend.username,
+        profileImg: friend.profileImg,
+      })),
+    },
   });
 };
 
 /* =====================================================
    CHECK USERNAME
 ===================================================== */
+const checkUsername = async ({ username, currentUserId, }) => {
+  const normalizedUsername = username.trim().toLowerCase();
 
-const checkUsername = async ({
-  username,
-  currentUserId,
-}) => {
-  const normalizedUsername =
-    username.trim().toLowerCase();
+  const existingUser = await User.findOne({ username: normalizedUsername, }).select("_id").lean();
 
-  const existingUser = await User.findOne({
-    username: normalizedUsername,
-  })
-    .select("_id")
-    .lean();
+  const available = !existingUser || String(existingUser._id) === String(currentUserId);
 
-  const available =
-    !existingUser ||
-    String(existingUser._id) === String(currentUserId);
-
-  return {
-    username: normalizedUsername,
-    available,
-  };
+  return { username: normalizedUsername, available, };
 };
 
 /* =====================================================
    FOLLOW / UNFOLLOW
 ===================================================== */
-
-const toggleFollow = async ({
-  profileUserId,
-  currentUserId,
-}) => {
+const toggleFollow = async ({ profileUserId, currentUserId, }) => {
   if (String(profileUserId) === String(currentUserId)) {
     throw new ApiError(400, "You cannot follow yourself.");
   }
 
-  const [currentUser, targetUser] = await Promise.all([
+  const [currentUser, targetUser,] = await Promise.all([
     User.findById(currentUserId),
     User.findById(profileUserId),
   ]);
@@ -154,9 +105,7 @@ const toggleFollow = async ({
     throw new ApiError(404, "User not found");
   }
 
-  const alreadyFollowing = currentUser.following.some(
-    (id) => String(id) === String(profileUserId)
-  );
+  const alreadyFollowing = currentUser.following.some((id) => String(id) === String(profileUserId));
 
   if (alreadyFollowing) {
     currentUser.following.pull(profileUserId);
@@ -166,10 +115,7 @@ const toggleFollow = async ({
     targetUser.followers.push(currentUserId);
   }
 
-  await Promise.all([
-    currentUser.save(),
-    targetUser.save(),
-  ]);
+  await Promise.all([currentUser.save(), targetUser.save(),]);
 
   return {
     following: !alreadyFollowing,
@@ -181,7 +127,6 @@ const toggleFollow = async ({
 /* =====================================================
    SEARCH USERS
 ===================================================== */
-
 const searchUsers = async (query) => {
   const trimmedQuery = query?.trim();
 
@@ -189,92 +134,54 @@ const searchUsers = async (query) => {
     return [];
   }
 
-  const users = await User.find({
-    username: {
-      $regex: trimmedQuery,
-      $options: "i",
-    },
-  })
-    .select("username profileImg isVerified")
-    .sort({ username: 1 })
-    .limit(10)
-    .lean();
+  const users = await User.find({ username: { $regex: trimmedQuery, $options: "i", }, }).select("username profileImg")
+    .sort({ username: 1, })
+    .limit(10);
 
   return users.map((user) => ({
     id: user._id,
     username: user.username,
     profileImg: user.profileImg,
-    isVerified: Boolean(user.isVerified),
-  }));
+  })
+  );
 };
 
 /* =====================================================
    FOLLOWERS
 ===================================================== */
-
-const getFollowers = async ({
-  profileUserId,
-  currentUserId,
-}) => {
-  const user = await User.findById(profileUserId)
-    .populate(
-      "followers",
-      "username profileImg followers isVerified"
-    );
+const getFollowers = async ({ profileUserId, currentUserId, }) => {
+  const user = await User.findById(profileUserId).populate("followers", "username profileImg followers");
 
   if (!user) {
     throw new ApiError(404, "User not found");
   }
 
-  return user.followers
-    .filter(Boolean)
-    .map((follower) => ({
-      id: follower._id,
-      username: follower.username,
-      profileImg: follower.profileImg,
-      isVerified: Boolean(follower.isVerified),
-      isFollowing: follower.followers.some(
-        (id) => String(id) === String(currentUserId)
-      ),
-    }));
+  return user.followers.map((follower) => ({
+    id: follower._id,
+    username: follower.username,
+    profileImg: follower.profileImg,
+    isFollowing: follower.followers.some((id) => String(id) === String(currentUserId)),
+  })
+  );
 };
 
 /* =====================================================
    FOLLOWING
 ===================================================== */
-
-const getFollowing = async ({
-  profileUserId,
-  currentUserId,
-}) => {
-  const user = await User.findById(profileUserId)
-    .populate(
-      "following",
-      "username profileImg followers isVerified"
-    );
+const getFollowing = async ({ profileUserId, currentUserId, }) => {
+  const user = await User.findById(profileUserId).populate("following", "username profileImg followers");
 
   if (!user) {
     throw new ApiError(404, "User not found");
   }
 
-  return user.following
-    .filter(Boolean)
-    .map((following) => ({
-      id: following._id,
-      username: following.username,
-      profileImg: following.profileImg,
-      isVerified: Boolean(following.isVerified),
-      isFollowing: following.followers.some(
-        (id) => String(id) === String(currentUserId)
-      ),
-    }));
+  return user.following.map((following) => ({
+    id: following._id,
+    username: following.username,
+    profileImg: following.profileImg,
+    isFollowing: following.followers.some((id) => String(id) === String(currentUserId)),
+  })
+  );
 };
 
-module.exports = {
-  getUserProfile,
-  checkUsername,
-  toggleFollow,
-  searchUsers,
-  getFollowers,
-  getFollowing,
-};
+module.exports = { getUserProfile, checkUsername, toggleFollow, searchUsers, getFollowers, getFollowing, };

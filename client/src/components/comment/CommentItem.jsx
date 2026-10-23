@@ -1,121 +1,131 @@
-import ButtonSpinner from "../UI/ButtonSpinner";
+import ButtonSpinner from "../ui/ButtonSpinner";
 import useProfileNavigation from "../../hooks/useProfileNavigation";
+
+// Convert a timestamp to a compact Instagram-style label.
+const formatRelativeTime = (dateValue) => {
+  if (!dateValue) return "";
+
+  const timestamp = new Date(dateValue).getTime();
+
+  if (Number.isNaN(timestamp)) return "";
+
+  const elapsedSeconds = Math.max(
+    0,
+    Math.floor((Date.now() - timestamp) / 1000)
+  );
+
+  if (elapsedSeconds < 60) return "now";
+
+  const minutes = Math.floor(elapsedSeconds / 60);
+  if (minutes < 60) return `${minutes}m`;
+
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h`;
+
+  const days = Math.floor(hours / 24);
+  if (days < 7) return `${days}d`;
+
+  const weeks = Math.floor(days / 7);
+  if (weeks < 5) return `${weeks}w`;
+
+  const months = Math.floor(days / 30);
+  if (months < 12) return `${months}mo`;
+
+  const years = Math.floor(days / 365);
+  return `${years}y`;
+};
 
 const CommentItem = ({
   comment,
   currentUserId,
   onDelete,
-  deleting,
+  deleting = false,
+  deleteDisabled = false,
 }) => {
-
-  const goToProfile =
-    useProfileNavigation();
+  const goToProfile = useProfileNavigation();
 
   const commentUserId =
-    comment.user?._id ??
-    comment.user?.id;
+    comment.user?._id ?? comment.user?.id;
+
+  const isCommentOwner =
+    Boolean(currentUserId && commentUserId) &&
+    String(commentUserId) === String(currentUserId);
 
   const handleProfileClick = () => {
-    if (!commentUserId) {
-      console.error(
-        "CommentItem: profile user ID missing",
-        comment.user
-      );
-      return;
-    }
+    if (!commentUserId) return;
 
     goToProfile(commentUserId);
   };
 
-  const isCommentOwner =
-    String(commentUserId) ===
-    String(currentUserId);
+  const timestamp = formatRelativeTime(comment.createdAt);
 
   return (
-    <div className="flex items-start gap-3 py-3">
-
-      {/* Avatar */}
-      <img
-        src={comment.user?.profileImg}
-        alt={
-          comment.user?.username ||
-          ""
-        }
+    <article className="flex min-w-0 items-start gap-3 py-3">
+      {/* AVATAR */}
+      <button
+        type="button"
         onClick={handleProfileClick}
-        className="
-          w-8
-          h-8
-          rounded-full
-          object-cover
-          cursor-pointer
-          shrink-0
-        "
-      />
+        aria-label={`View ${comment.user?.username ?? "user"} profile`}
+        className="h-8 w-8 shrink-0 overflow-hidden rounded-full"
+      >
+        <img
+          src={comment.user?.profileImg}
+          alt=""
+          className="h-full w-full object-cover"
+        />
+      </button>
 
-      {/* Content */}
-      <div className="flex-1 min-w-0">
-
-        {/* Username */}
-        <p
-          onClick={handleProfileClick}
-          className="
-            text-white
-            font-semibold
-            text-[13px]
-            leading-4
-            cursor-pointer
-            hover:text-zinc-300
-            transition
-          "
-        >
-          {comment.user?.username}
+      {/* COMMENT CONTENT */}
+      <div className="min-w-0 flex-1">
+        <p className="break-words text-[13px] leading-[18px] text-zinc-300">
+          <button
+            type="button"
+            onClick={handleProfileClick}
+            className="mr-1 font-semibold text-white hover:text-zinc-300"
+          >
+            {comment.user?.username}
+          </button>
+          <span className="font-medium text-white">:</span>{" "}
+          <span>{comment.content}</span>
         </p>
 
-        {/* Comment */}
-        <p
-          className="
-            text-zinc-300
-            text-[13px]
-            break-words
-          "
-        >
-          {comment.content}
-        </p>
-
+        {/* TIMESTAMP */}
+        {timestamp && (
+          <time
+            dateTime={
+              comment.createdAt
+                ? new Date(comment.createdAt).toISOString()
+                : undefined
+            }
+            className="mt-1 block text-[11px] text-zinc-500"
+          >
+            {timestamp}
+          </time>
+        )}
       </div>
 
-      {/* Delete */}
+      {/* DELETE ACTION — ONLY THIS COMMENT SHOWS LOADING */}
       {isCommentOwner && (
         <button
           type="button"
-          onClick={() =>
-            onDelete(comment.id)
+          onClick={() => onDelete(comment.id)}
+          disabled={deleteDisabled}
+          aria-label={
+            deleting ? "Deleting comment" : "Delete comment"
           }
-          disabled={deleting}
-          className="
-            flex
-            items-center
-            gap-2
-            text-xs
-            text-red-500
-            hover:text-red-400
-            disabled:opacity-50
-            disabled:cursor-not-allowed
-            transition
-          "
+          className="flex shrink-0 items-center gap-1.5 pt-0.5 text-xs text-red-500 transition hover:text-red-400 disabled:cursor-not-allowed disabled:opacity-50"
         >
           {deleting ? (
             <>
-              <ButtonSpinner size={14} />
-              Deleting...
+              <ButtonSpinner size={13} />
+              <span>Deleting...</span>
             </>
           ) : (
             "Delete"
           )}
         </button>
       )}
-
-    </div>
+    </article>
   );
 };
 

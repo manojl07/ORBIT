@@ -26,7 +26,6 @@ const createGoogleClient = () => {
 
 const getGoogleAuthUrl = ({state,codeChallenge,nonce,}) => {
   const config = getGoogleConfig();
-
   const client = createGoogleClient();
 
   return client.generateAuthUrl({

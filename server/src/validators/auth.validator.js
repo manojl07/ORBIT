@@ -2,32 +2,17 @@ const { z } = require("zod");
 
 const usernameRegex = /^[a-zA-Z0-9._]{3,30}$/;
 
-const passwordRegex =
-  /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&]).{8,64}$/;
+const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&]).{8,64}$/;
 
-const usernameSchema = z
-  .string()
-  .trim()
-  .min(3, "Username must be at least 3 characters")
-  .max(30, "Username cannot exceed 30 characters")
-  .regex(
-    usernameRegex,
-    "Username can only contain letters, numbers, dots and underscores"
-  );
-
-const passwordSchema = z
-  .string()
-  .regex(
-    passwordRegex,
-    "Password must be 8–64 characters and include uppercase, lowercase, a number and a special character (@$!%*?&)"
-  );
-
-const emailSchema = z.string().trim().email();
+const usernameSchema = z.string().trim()
+.min(3, "Username must be at least 3 characters")
+.max(30, "Username cannot exceed 30 characters")
+.regex(usernameRegex, "Username can only contain letters, numbers, dots and underscores");
 
 const registerSchema = z.object({
   username: usernameSchema,
-  email: emailSchema,
-  password: passwordSchema,
+  email: z.string().trim().email(),
+  password: z.string().regex(passwordRegex, "Weak Password"),
   bio: z.string().max(150).optional(),
 });
 
@@ -47,47 +32,25 @@ const tokenSchema = z.object({
 });
 
 const resendVerificationSchema = z.object({
-  email: emailSchema,
+  email: z.string().trim().email(),
 });
 
 const forgotPasswordSchema = z.object({
-  email: emailSchema,
+  email: z.string().trim().email(),
 });
 
 const resetPasswordSchema = z.object({
   token: z.string().min(20),
-  password: passwordSchema,
-});
-
-const googlePasswordSetupRequestSchema = z.object({
-  email: emailSchema,
-});
-
-const googlePasswordSetupCompleteSchema = z.object({
-  token: z.string().min(20),
-  password: passwordSchema,
+  password: z.string().regex(passwordRegex, "Weak Password"),
 });
 
 const updateProfileSchema = z.object({
   username: usernameSchema.optional(),
-  bio: z.string().trim().max(150, "Bio cannot exceed 150 characters").optional(),
+  bio: z.string().trim().max(150,"Bio cannot exceed more than 150 characters").optional(),
 });
 
 const checkUsernameSchema = z.object({
   username: usernameSchema,
 });
 
-module.exports = {
-  registerSchema,
-  loginSchema,
-  refreshSchema,
-  logoutSchema,
-  tokenSchema,
-  resendVerificationSchema,
-  forgotPasswordSchema,
-  resetPasswordSchema,
-  googlePasswordSetupRequestSchema,
-  googlePasswordSetupCompleteSchema,
-  updateProfileSchema,
-  checkUsernameSchema,
-};
+module.exports = {registerSchema,loginSchema,refreshSchema,logoutSchema,tokenSchema,resendVerificationSchema,forgotPasswordSchema,resetPasswordSchema,updateProfileSchema,checkUsernameSchema,};

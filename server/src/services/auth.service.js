@@ -15,7 +15,7 @@ const { verifyRefreshToken, } = require("../utils/jwt");
 
 const { generateOneTimeToken, hashOneTimeToken, } = require("../utils/oneTimeToken");
 
-const {sendVerificationEmail,sendPasswordResetEmail,sendGooglePasswordSetupEmail,} = require("./email.service");
+const { sendVerificationEmail, sendPasswordResetEmail, } = require("./email.service");
 
 /* =====================================================
    USER SANITIZER
@@ -44,7 +44,7 @@ const hashToken = (token) => {
 ===================================================== */
 const findUser = async (identifier) => {
   const normalized = identifier.trim().toLowerCase();
-  const user = await User.findOne({$or: [{ email: normalized }, { username: normalized },],}).select("+password");
+  const user = await User.findOne({ $or: [{ email: normalized }, { username: normalized },], }).select("+password");
   if (!user) throw new ApiError(401, "Invalid credentials");
   return user;
 };
@@ -115,11 +115,11 @@ const login = async ({ identifier, password, deviceId, userAgent, ipAddress, }) 
   const matched = await user.comparePassword(password);
 
   if (!matched) throw new ApiError(401, "Invalid credentials");
-  
+
   const { accessToken, refreshToken, } = createTokens(user);
   const session = await createSession({ user, refreshToken, deviceId, userAgent, ipAddress, });
 
-  return {user: sanitizeUser(user),accessToken,refreshToken,sessionId: session._id,deviceId,};
+  return { user: sanitizeUser(user), accessToken, refreshToken, sessionId: session._id, deviceId, };
 };
 
 /* =====================================================
@@ -173,9 +173,7 @@ const loginWithGoogle = async ({ googleId, email, emailVerified, name, picture, 
 
   if (user) {
     user.googleId = googleId;
-
     user.isVerified = true;
-
     user.emailVerifiedAt = user.emailVerifiedAt || new Date();
 
     if (picture && !user.profileImg) {
@@ -221,40 +219,54 @@ const getMe = async (userId) => {
 };
 
 /* =====================================================
-   REFRESH
+   REFRESH — ROTATE REFRESH TOKEN
 ===================================================== */
+
 const refresh = async ({ refreshToken, deviceId, userAgent, ipAddress, }) => {
-  if (!refreshToken) {
-    throw new ApiError(401, "Refresh token missing");
+  if (!refreshToken || !deviceId) {
+    throw new ApiError(401, "Refresh token or device ID missing");
   }
 
-  const decoded = verifyRefreshToken(refreshToken);
+  // Invalid or expired refresh JWTs should return 401.
+  let decoded;
 
-  const tokenHash = hashToken(refreshToken);
-
-  const session = await Session.findOne({ tokenHash, deviceId, });
-
-  if (!session) {
-    throw new ApiError(401, "Invalid refresh token");
+  try {
+    decoded = verifyRefreshToken(refreshToken);
+  } catch (error) {
+    if (error.name === "TokenExpiredError" || error.name === "JsonWebTokenError" || error.name === "NotBeforeError") {
+      throw new ApiError(401, "Refresh token is invalid or expired");
+    }
+    throw error;
   }
 
   const user = await User.findById(decoded.id);
 
   if (!user) {
-    throw new ApiError(404, "User not found");
+    throw new ApiError(401, "Invalid refresh session");
   }
 
+  const tokenHash = hashToken(refreshToken);
+
+  // Atomically consume the old session.
+  // Only one concurrent request can match and delete it.
+  const oldSession = await Session.findOneAndDelete({
+    user: user._id,
+    tokenHash,
+    deviceId,
+    expiresAt: { $gt: new Date() },
+  });
+
+  if (!oldSession) {
+    throw new ApiError(401, "Refresh session is invalid or expired");
+  }
+
+  // Issue a new pair of ORBIT tokens.
   const { accessToken, refreshToken: newRefreshToken, } = createTokens(user);
 
-  await Session.findByIdAndDelete(session._id);
-
+  // Store the hash of the new refresh token.
   const newSession = await createSession({ user, refreshToken: newRefreshToken, deviceId, userAgent, ipAddress, });
 
-  return {
-    accessToken,
-    refreshToken: newRefreshToken,
-    sessionId: newSession._id,
-  };
+  return { accessToken, refreshToken: newRefreshToken, sessionId: newSession._id, };
 };
 
 /* =====================================================
@@ -345,32 +357,25 @@ const resendVerification = async (email) => {
 const forgotPassword = async (email) => {
   const normalized = email.trim().toLowerCase();
 
-  const genericResponse =
-    "If an account exists with that email, a password reset link has been sent.";
+  const genericResponse = "If an account exists with that email, a password reset link has been sent.";
 
-  const user = await User.findOne({
-    email: normalized,
-  }).select("+password");
+  const user = await User.findOne({ email: normalized, });
 
-  // Do not expose whether the account exists or whether it has a password.
-  if (!user || !user.password) {
-    return { message: genericResponse };
+  if (!user) {
+    return {
+      message: genericResponse,
+    };
   }
 
-  const token = await createAuthToken({
-    userId: user._id,
-    type: "passwordReset",
-    expiresIn: 15 * 60 * 1000,
-  });
+  const token = await createAuthToken({ userId: user._id, type: "passwordReset", expiresIn: 15 * 60 * 1000, });
 
-  await sendPasswordResetEmail({
-    email: user.email,
-    username: user.username,
-    token,
-  });
+  await sendPasswordResetEmail({ email: user.email, username: user.username, token, });
 
-  return { message: genericResponse };
+  return {
+    message: genericResponse,
+  };
 };
+
 /* =====================================================
    RESET PASSWORD
 ===================================================== */
@@ -406,110 +411,14 @@ const resetPassword = async ({ token, password, }) => {
   return true;
 };
 
-const requestGooglePasswordSetup = async (email) => {
-  const normalized = email.trim().toLowerCase();
-
-  const genericResponse =
-    "If your verified Google account is eligible, a password setup email has been sent.";
-
-  const user = await User.findOne({
-    email: normalized,
-  }).select("+password +googleId");
-
-  // Always return the same message for ineligible or nonexistent accounts.
-  if (
-    !user ||
-    !user.googleId ||
-    user.password ||
-    !user.isVerified ||
-    !user.emailVerifiedAt
-  ) {
-    return { message: genericResponse };
-  }
-
-  const token = await createAuthToken({
-    userId: user._id,
-    type: "googlePasswordSetup",
-    expiresIn: 15 * 60 * 1000,
-  });
-
-  await sendGooglePasswordSetupEmail({
-    email: user.email,
-    username: user.username,
-    token,
-  });
-
-  return { message: genericResponse };
-};
-
-
-const completeGooglePasswordSetup = async ({ token, password }) => {
-  const tokenHash = hashOneTimeToken(token);
-
-  // Atomically consume the valid token so concurrent requests cannot
-  // successfully use the same token more than once.
-  const authToken = await AuthToken.findOneAndDelete({
-    tokenHash,
-    type: "googlePasswordSetup",
-    expiresAt: { $gt: new Date() },
-  });
-
-  if (!authToken) {
-    throw new ApiError(
-      400,
-      "Invalid, expired, or already-used password setup link",
-      "INVALID_PASSWORD_SETUP_TOKEN"
-    );
-  }
-
-  const user = await User.findById(authToken.user).select(
-    "+password +googleId"
-  );
-
-  if (
-    !user ||
-    !user.googleId ||
-    user.password ||
-    !user.isVerified ||
-    !user.emailVerifiedAt
-  ) {
-    throw new ApiError(
-      400,
-      "This account is not eligible for password setup",
-      "PASSWORD_SETUP_NOT_ALLOWED"
-    );
-  }
-
-  // The existing User pre-save hook hashes this password.
-  user.password = password;
-  await user.save();
-
-  // Credential setup is security-sensitive: revoke existing sessions
-  // and any outstanding authentication tokens for this account.
-  await Promise.all([
-    Session.deleteMany({ user: user._id }),
-    AuthToken.deleteMany({ user: user._id }),
-  ]);
-
-  return true;
-};
 /* =====================================================
    UPDATE PROFILE
 ===================================================== */
-const updateProfile = async ({
-  userId,
-  username,
-  bio,
-  profileImg,
-}) => {
-  const user =
-    await User.findById(userId);
+const updateProfile = async ({ userId, username, bio, profileImg, }) => {
+  const user = await User.findById(userId);
 
   if (!user) {
-    throw new ApiError(
-      404,
-      "User not found"
-    );
+    throw new ApiError(404, "User not found");
   }
 
   /* ========================================
@@ -517,35 +426,18 @@ const updateProfile = async ({
   ======================================== */
 
   if (username !== undefined) {
-    const normalizedUsername =
-      username
-        .trim()
-        .toLowerCase();
-
-    if (
-      normalizedUsername !==
-      user.username
-    ) {
-      const usernameExists =
-        await User.exists({
-          username:
-            normalizedUsername,
-
-          _id: {
-            $ne: user._id,
-          },
-        });
+    const normalizedUsername = username.trim().toLowerCase();
+    if (normalizedUsername !== user.username) {
+      const usernameExists = await User.exists({
+        username: normalizedUsername,
+        _id: { $ne: user._id, },
+      });
 
       if (usernameExists) {
-        throw new ApiError(
-          409,
-          "Username is already taken",
-          "USERNAME_TAKEN"
-        );
+        throw new ApiError(409, "Username is already taken", "USERNAME_TAKEN");
       }
 
-      user.username =
-        normalizedUsername;
+      user.username = normalizedUsername;
     }
   }
 
@@ -622,19 +514,4 @@ const updateProfile = async ({
   };
 };
 
-module.exports = {
-  register,
-  login,
-  loginWithGoogle,
-  getMe,
-  refresh,
-  logout,
-  logoutAll,
-  updateProfile,
-  verifyEmail,
-  resendVerification,
-  forgotPassword,
-  resetPassword,
-  requestGooglePasswordSetup,
-  completeGooglePasswordSetup,
-};
+module.exports = { register, login, loginWithGoogle, getMe, refresh, logout, logoutAll, updateProfile, verifyEmail, resendVerification, forgotPassword, resetPassword, };

@@ -5,11 +5,7 @@ const storage = multer.memoryStorage();
 
 const allowedExtensions = [".jpg", ".jpeg", ".png", ".gif", ".webp", ".jfif", ".bmp", ".svg", ".avif",];
 
-const upload = multer({
-  storage,
-  limits: {
-    fileSize: 20 * 1024 * 1024,
-  },
+const upload = multer({storage,limits: {fileSize: 20 * 1024 * 1024,},
 
   fileFilter(req, file, cb) {
     const ext = path.extname(file.originalname).toLowerCase();

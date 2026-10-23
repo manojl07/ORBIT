@@ -1,5 +1,5 @@
 
-import { useState } from "react";
+import { Fragment, useState } from "react";
 import {
   MoreHorizontal,
   Pencil,
@@ -25,6 +25,11 @@ const ProfileHeader = ({
     setFollowersOpen(false);
     setFollowingOpen(false);
   };
+
+  console.log("ProfileHeader verification:", {
+    username: user?.username,
+    isVerified: user?.isVerified,
+  });
 
   const mutualFriends = user.mutualFriends;
   const mutualUsers = mutualFriends?.users ?? [];
@@ -210,20 +215,18 @@ const ProfileStat = ({ value, label }) => (
 ============================================= */
 
 const MutualFriends = ({ mutualFriends }) => {
-  const users = mutualFriends.users ?? [];
-  const count = mutualFriends.count ?? 0;
+  const users = mutualFriends?.users ?? [];
+  const count = mutualFriends?.count ?? 0;
 
   if (!count || !users.length) {
     return null;
   }
 
-  const displayedNames = users
-    .slice(0, 2)
-    .map((user) => user.username);
+  const displayedUsers = users.slice(0, 2);
 
   const remainingCount = Math.max(
     0,
-    count - displayedNames.length
+    count - displayedUsers.length
   );
 
   return (
@@ -231,33 +234,43 @@ const MutualFriends = ({ mutualFriends }) => {
       className="mt-4 flex min-w-0 items-center gap-2"
       aria-label={`${count} mutual connections`}
     >
-      {/* OVERLAPPING AVATARS */}
+      {/* CLICKABLE, OVERLAPPING PROFILE PICTURES */}
       <div className="flex shrink-0 items-center pl-0.5">
         {users.slice(0, 3).map((friend, index) => (
-          <img
+          <Link
             key={friend.id}
-            src={friend.profileImg}
-            alt={friend.username}
+            to={`/profile/${friend.id}`}
+            aria-label={`View ${friend.username}'s profile`}
             title={friend.username}
-            className={`h-7 w-7 rounded-full border-2 border-black object-cover ${index > 0 ? "-ml-2" : ""
-              }`}
-          />
+            className={`relative block h-7 w-7 cursor-pointer rounded-full
+              focus-visible:outline-2 focus-visible:outline-blue-500
+              ${index > 0 ? "-ml-2" : ""}`}
+          >
+            <img
+              src={friend.profileImg}
+              alt={friend.username}
+              className="h-full w-full rounded-full border-2 border-black object-cover transition-opacity hover:opacity-75"
+            />
+          </Link>
         ))}
       </div>
 
-      {/* MUTUAL TEXT */}
+      {/* CLICKABLE USERNAMES */}
       <p className="min-w-0 text-xs leading-5 text-zinc-400 sm:text-sm">
         <span>Followed by </span>
 
-        {displayedNames.map((name, index) => (
-          <span key={name}>
-            <span className="font-semibold text-zinc-200">
-              {name}
-            </span>
+        {displayedUsers.map((friend, index) => (
+          <Fragment key={friend.id}>
+            {index > 0 && " and "}
 
-            {index < displayedNames.length - 1 &&
-              " and "}
-          </span>
+            <Link
+              to={`/profile/${friend.id}`}
+              title={`View ${friend.username}'s profile`}
+              className="cursor-pointer font-semibold text-zinc-200 hover:text-white hover:underline"
+            >
+              {friend.username}
+            </Link>
+          </Fragment>
         ))}
 
         {remainingCount > 0 && (
@@ -267,7 +280,6 @@ const MutualFriends = ({ mutualFriends }) => {
     </div>
   );
 };
-
 /* =============================================
    PROFILE ACTIONS
 ============================================= */

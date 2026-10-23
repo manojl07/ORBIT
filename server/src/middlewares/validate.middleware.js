@@ -1,5 +1,16 @@
 const ApiError = require("../utils/ApiError");
 
+const validate = (schema) => {
+  return (req, res, next) => {
+    const result = schema.safeParse(req.body);
+
+    if (!result.success) return next(new ApiError(400,getValidationMessage(result)));
+  
+    req.body = result.data;
+    next();
+  };
+};
+
 const getValidationMessage = (result) => {
   const issues =result.error?.issues ??result.error?.errors ??[];
 
@@ -8,27 +19,6 @@ const getValidationMessage = (result) => {
   }
 
   return issues.map((issue) => issue.message).join(", ");
-};
-
-
-const validate = (schema) => {
-  return (req, res, next) => {
-    const result = schema.safeParse(req.body);
-
-    if (!result.success) {
-      const issues = result.error.issues ?? result.error.errors ?? [];
-
-      return next(
-        new ApiError(
-          400,
-          issues.map((issue) => issue.message).join(", ")
-        )
-      );
-    }
-
-    req.body = result.data;
-    return next();
-  };
 };
 
 

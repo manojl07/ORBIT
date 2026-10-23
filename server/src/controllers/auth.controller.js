@@ -51,6 +51,104 @@ const loginController = asyncHandler(async (req, res) => {
 });
 
 /* =====================================================
+   GOOGLE START
+===================================================== */
+const googleAuthController = asyncHandler(async (req, res) => {
+  const { OAuth2Client, } = require("google-auth-library");
+
+  const state = crypto.randomBytes(32).toString("hex");
+
+  const nonce = crypto.randomBytes(32).toString("hex");
+
+  const tempClient = new OAuth2Client();
+
+  const { codeVerifier, codeChallenge, } = await tempClient.generateCodeVerifierAsync();
+
+  const authUrl = getGoogleAuthUrl({ state, codeChallenge, nonce, });
+
+  const oauthCookieOptions = { httpOnly: true, secure: process.env.NODE_ENV === "production", sameSite: "lax", maxAge: 10 * 60 * 1000, path: "/api/auth", };
+
+  res.cookie("oauthState", state, oauthCookieOptions);
+
+  res.cookie("oauthCodeVerifier", codeVerifier, oauthCookieOptions);
+
+  res.cookie("oauthNonce", nonce, oauthCookieOptions);
+
+  return res.redirect(authUrl);
+});
+
+/* =====================================================
+   GOOGLE CALLBACK
+===================================================== */
+const googleCallbackController = asyncHandler(async (req, res) => {
+  const clientUrl = (process.env.CLIENT_URL || "").replace(/\/$/, "");
+
+  const { code, state, error, } = req.query;
+
+  const oauthCookieOptions = { httpOnly: true, secure: process.env.NODE_ENV === "production", sameSite: "lax", path: "/api/auth", };
+
+  const cleanupOAuthCookies = () => {
+    res.clearCookie("oauthState", oauthCookieOptions);
+    res.clearCookie("oauthCodeVerifier", oauthCookieOptions);
+    res.clearCookie("oauthNonce", oauthCookieOptions);
+  };
+
+  if (error) {
+    cleanupOAuthCookies();
+    return res.redirect(`${clientUrl}/login?oauth=cancelled`);
+  }
+
+  if (!code || !state || !req.cookies.oauthState) {
+    cleanupOAuthCookies();
+    return res.redirect(`${clientUrl}/login?oauth=invalid`);
+  }
+
+  const storedState = req.cookies.oauthState;
+
+  if (storedState.length !== state.length) {
+    cleanupOAuthCookies();
+    return res.redirect(`${clientUrl}/login?oauth=invalid`);
+  }
+
+  const validState = crypto.timingSafeEqual(Buffer.from(storedState), Buffer.from(state));
+
+  if (!validState) {
+    cleanupOAuthCookies();
+    return res.redirect(`${clientUrl}/login?oauth=invalid`);
+  }
+
+  try {
+    const googleProfile = await exchangeGoogleCode({ code, codeVerifier: req.cookies.oauthCodeVerifier, });
+
+    if (googleProfile.nonce !== req.cookies.oauthNonce) {
+      throw new ApiError(401, "Invalid Google authentication response");
+    }
+
+    const result = await authService.loginWithGoogle({
+      googleId: googleProfile.sub,
+      email: googleProfile.email,
+      emailVerified: googleProfile.email_verified === true,
+      name: googleProfile.name,
+      picture: googleProfile.picture,
+      deviceId: crypto.randomUUID(),
+      userAgent: req.get("user-agent"),
+      ipAddress: req.ip,
+    });
+
+    setAuthCookies(res, result);
+    cleanupOAuthCookies();
+
+    return res.redirect(`${clientUrl}/`);
+  } catch (oauthError) {
+    cleanupOAuthCookies();
+
+    console.error("Google OAuth failed:", oauthError);
+
+    return res.redirect(`${clientUrl}/login?oauth=failed`);
+  }
+});
+
+/* =====================================================
    GET ME
 ===================================================== */
 const getMeController = asyncHandler(async (req, res) => {
@@ -125,7 +223,6 @@ const updateProfileController = asyncHandler(async (req, res) => {
 ===================================================== */
 const verifyEmailController = asyncHandler(async (req, res) => {
   const user = await authService.verifyEmail(req.body.token);
-
   return res.status(200).json(new ApiResponse(200, "Email verified successfully", user));
 });
 
@@ -134,7 +231,6 @@ const verifyEmailController = asyncHandler(async (req, res) => {
 ===================================================== */
 const resendVerificationController = asyncHandler(async (req, res) => {
   const result = await authService.resendVerification(req.body.email);
-
   return res.status(200).json(new ApiResponse(200, result.message));
 });
 
@@ -143,7 +239,6 @@ const resendVerificationController = asyncHandler(async (req, res) => {
 ===================================================== */
 const forgotPasswordController = asyncHandler(async (req, res) => {
   const result = await authService.forgotPassword(req.body.email);
-
   return res.status(200).json(new ApiResponse(200, result.message));
 });
 
@@ -152,152 +247,9 @@ const forgotPasswordController = asyncHandler(async (req, res) => {
 ===================================================== */
 const resetPasswordController = asyncHandler(async (req, res) => {
   await authService.resetPassword({ token: req.body.token, password: req.body.password, });
-
   clearAuthCookies(res);
-
   return res.status(200).json(new ApiResponse(200, "Password reset successfully"));
 });
 
-const requestGooglePasswordSetupController = asyncHandler(
-  async (req, res) => {
-    const result = await authService.requestGooglePasswordSetup(
-      req.body.email
-    );
 
-    return res
-      .status(200)
-      .json(new ApiResponse(200, result.message));
-  }
-);
-
-const completeGooglePasswordSetupController = asyncHandler(
-  async (req, res) => {
-    await authService.completeGooglePasswordSetup({
-      token: req.body.token,
-      password: req.body.password,
-    });
-
-    clearAuthCookies(res);
-
-    return res
-      .status(200)
-      .json(new ApiResponse(200, "ORBIT password set up successfully"));
-  }
-);
-
-/* =====================================================
-   GOOGLE START
-===================================================== */
-const googleAuthController = asyncHandler(async (req, res) => {
-  const { OAuth2Client, } = require("google-auth-library");
-
-  const state = crypto.randomBytes(32).toString("hex");
-
-  const nonce = crypto.randomBytes(32).toString("hex");
-
-  const tempClient = new OAuth2Client();
-
-  const { codeVerifier, codeChallenge, } = await tempClient.generateCodeVerifierAsync();
-
-  const authUrl = getGoogleAuthUrl({ state, codeChallenge, nonce, });
-
-  const oauthCookieOptions = { httpOnly: true, secure: process.env.NODE_ENV === "production", sameSite: "lax", maxAge: 10 * 60 * 1000, path: "/api/auth", };
-
-  res.cookie("oauthState", state, oauthCookieOptions);
-
-  res.cookie("oauthCodeVerifier", codeVerifier, oauthCookieOptions);
-
-  res.cookie("oauthNonce", nonce, oauthCookieOptions);
-
-  return res.redirect(authUrl);
-});
-
-/* =====================================================
-   GOOGLE CALLBACK
-===================================================== */
-const googleCallbackController = asyncHandler(async (req, res) => {
-  const clientUrl = (process.env.CLIENT_URL || "").replace(/\/$/, "");
-
-  const { code, state, error, } = req.query;
-
-  const oauthCookieOptions = { httpOnly: true, secure: process.env.NODE_ENV === "production", sameSite: "lax", path: "/api/auth", };
-
-  const cleanupOAuthCookies = () => {
-    res.clearCookie("oauthState", oauthCookieOptions);
-    res.clearCookie("oauthCodeVerifier", oauthCookieOptions);
-    res.clearCookie("oauthNonce", oauthCookieOptions);
-  };
-
-  if (error) {
-    cleanupOAuthCookies();
-    return res.redirect(`${clientUrl}/login?oauth=cancelled`);
-  }
-
-  if (!code || !state || !req.cookies.oauthState) {
-    cleanupOAuthCookies();
-
-    return res.redirect(`${clientUrl}/login?oauth=invalid`);
-  }
-
-  const storedState = req.cookies.oauthState;
-
-  if (storedState.length !== state.length) {
-    cleanupOAuthCookies();
-    return res.redirect(`${clientUrl}/login?oauth=invalid`);
-  }
-
-  const validState = crypto.timingSafeEqual(Buffer.from(storedState), Buffer.from(state));
-
-  if (!validState) {
-    cleanupOAuthCookies();
-    return res.redirect(`${clientUrl}/login?oauth=invalid`);
-  }
-
-  try {
-    const googleProfile = await exchangeGoogleCode({ code, codeVerifier: req.cookies.oauthCodeVerifier, });
-
-    if (googleProfile.nonce !== req.cookies.oauthNonce) {
-      throw new ApiError(401, "Invalid Google authentication response");
-    }
-
-    const result = await authService.loginWithGoogle({
-      googleId: googleProfile.sub,
-      email: googleProfile.email,
-      emailVerified: googleProfile.email_verified === true,
-      name: googleProfile.name,
-      picture: googleProfile.picture,
-      deviceId: crypto.randomUUID(),
-      userAgent: req.get("user-agent"),
-      ipAddress: req.ip,
-    });
-
-    setAuthCookies(res, result);
-    cleanupOAuthCookies();
-
-    return res.redirect(`${clientUrl}/`);
-  } catch (oauthError) {
-    cleanupOAuthCookies();
-
-    console.error("Google OAuth failed:", oauthError);
-
-    return res.redirect(`${clientUrl}/login?oauth=failed`);
-  }
-});
-
-module.exports = {
-  registerController,
-  loginController,
-  getMeController,
-  refreshController,
-  logoutController,
-  logoutAllController,
-  updateProfileController,
-  verifyEmailController,
-  resendVerificationController,
-  forgotPasswordController,
-  resetPasswordController,
-  googleAuthController,
-  googleCallbackController,
-  requestGooglePasswordSetupController,
-  completeGooglePasswordSetupController,
-};
+module.exports = { registerController, loginController, getMeController, refreshController, logoutController, logoutAllController, updateProfileController, verifyEmailController, resendVerificationController, forgotPasswordController, resetPasswordController, googleAuthController, googleCallbackController, };
