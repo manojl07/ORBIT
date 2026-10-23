@@ -1,4 +1,9 @@
+@import url('https://fonts.googleapis.com/css2?family=Tiny5&display=swap');
 @import "tailwindcss";
+
+:root {
+  --font-orbit: "Tiny5", sans-serif;
+}
 
 /* =========================================
    Instagram-style scroll container

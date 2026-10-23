@@ -16,6 +16,7 @@ import {
 import { useAuth } from "../hooks/useAuth";
 import useLogout from "../hooks/useLogout";
 import SearchBar from "../components/search/SearchBar";
+import OrbitBrand from "../components/ui/OrbitBrand.jsx";
 
 const Navbar = ({ onOpenModal }) => {
   const { user } = useAuth();
@@ -104,49 +105,19 @@ const Navbar = ({ onOpenModal }) => {
           md:grid-cols-3
         "
       >
-        {/* ========================================
-            LEFT — LOGO
-        ======================================== */}
+{/* ========================================
+    LEFT — ORBIT BRAND
+======================================== */}
 
-        <div
-          className="
-            flex
-            justify-start
-          "
-        >
-          <Link
-            to="/"
-            className="
-              relative
-              inline-block
-
-              font-[cursive]
-              italic
-              font-black
-
-              text-3xl
-              sm:text-4xl
-
-              tracking-wide
-
-              bg-linear-to-b
-              from-white
-              via-zinc-200
-              to-zinc-500
-
-              bg-clip-text
-              text-transparent
-
-              drop-shadow-[0_3px_5px_rgba(0,0,0,0.8)]
-
-              transition-transform
-              duration-300
-              hover:scale-105
-            "
-          >
-            Orbit
-          </Link>
-        </div>
+<div className="flex justify-start">
+  <Link
+    to="/"
+    aria-label="ORBIT home"
+    className="inline-flex items-center transition-transform duration-200 hover:scale-[1.02]"
+  >
+    <OrbitBrand />
+  </Link>
+</div>
 
         {/* ========================================
             CENTER — SEARCH
