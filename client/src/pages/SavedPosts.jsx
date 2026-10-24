@@ -1,5 +1,6 @@
 
 import { useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { useInfiniteQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Bookmark,
@@ -66,8 +67,16 @@ const activityTabs = [
 ===================================================== */
 
 const SavedPosts = () => {
-  const [activeTab, setActiveTab] = useState("saved");
+  const [searchParams, setSearchParams] = useSearchParams();
   const [selectedPost, setSelectedPost] = useState(null);
+
+  const requestedTab = searchParams.get("tab");
+
+  const activeTab = activityTabs.some(
+    (item) => item.id === requestedTab
+  )
+    ? requestedTab
+    : "saved";
 
   const queryClient = useQueryClient();
 
@@ -118,7 +127,11 @@ const SavedPosts = () => {
     ) ?? [];
 
   const handleTabChange = (tabId) => {
-    setActiveTab(tabId);
+    const nextParams = new URLSearchParams(searchParams);
+
+    nextParams.set("tab", tabId);
+
+    setSearchParams(nextParams, { replace: true });
     setSelectedPost(null);
   };
 
@@ -173,11 +186,10 @@ const SavedPosts = () => {
                 aria-selected={active}
                 aria-controls="activity-panel"
                 onClick={() => handleTabChange(item.id)}
-                className={`relative flex min-h-12 items-center justify-center gap-2 px-2 text-sm font-medium transition sm:min-h-14 sm:text-base ${
-                  active
-                    ? "text-white"
-                    : "text-zinc-500 hover:text-zinc-200"
-                }`}
+                className={`relative flex min-h-12 items-center justify-center gap-2 px-2 text-sm font-medium transition sm:min-h-14 sm:text-base ${active
+                  ? "text-white"
+                  : "text-zinc-500 hover:text-zinc-200"
+                  }`}
               >
                 <Icon
                   size={18}
@@ -273,6 +285,7 @@ const SavedPosts = () => {
         isOpen={Boolean(selectedPost)}
         onClose={handleCloseModal}
         post={selectedPost}
+        sourceQueryKey={tab.queryKey}
       />
     </div>
   );
@@ -300,9 +313,8 @@ const ActivityPostTile = ({
         <button
           type="button"
           onClick={() => onPostClick(post)}
-          aria-label={`Open post${
-            post.caption ? `: ${post.caption}` : ""
-          }`}
+          aria-label={`Open post${post.caption ? `: ${post.caption}` : ""
+            }`}
           className="absolute inset-0 h-full w-full outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-white"
         >
           <img

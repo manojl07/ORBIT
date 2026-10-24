@@ -226,11 +226,12 @@ const CreatePostModal = ({ isOpen, onClose }) => {
 
               <div
                 className="
-                  grid
-                  grid-cols-1
-                  lg:grid-cols-[1.1fr_0.9fr]
-                  gap-3
-                  sm:gap-6
+                grid
+    grid-cols-1
+    gap-4
+    sm:gap-6
+    xl:grid-cols-[minmax(0,460px)_minmax(320px,1fr)]
+    xl:items-stretch
                 "
               >
 

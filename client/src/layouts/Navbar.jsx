@@ -113,7 +113,7 @@ const Navbar = ({ onOpenModal }) => {
   <Link
     to="/"
     aria-label="ORBIT home"
-    className="inline-flex items-center transition-transform duration-200 hover:scale-[1.02]"
+    className="inline-flex items-center transition-transform duration-400 hover:scale-[1.05]"
   >
     <OrbitBrand />
   </Link>

@@ -26,7 +26,7 @@ const getPostsFromQueryData = (queryData) => {
    POST MODAL
 ===================================================== */
 
-const PostModal = ({ isOpen, onClose, post }) => {
+const PostModal = ({ isOpen, onClose, post, sourceQueryKey, }) => {
   const queryClient = useQueryClient();
   const { user } = useAuth();
 
@@ -73,10 +73,23 @@ const PostModal = ({ isOpen, onClose, post }) => {
    * Saved posts are checked first because this modal can
    * be opened from the Saved Posts page.
    */
+  // Identify the owner of the selected post.
+  const postOwnerId =
+    post?.user?._id ?? post?.user?.id;
+
+  // Prefer the profile's user-posts cache because
+  // PostActions updates this cache in the modal.
   const cachedPost =
-    findCachedPost(["saved-posts"]) ||
+    (sourceQueryKey
+      ? findCachedPost(sourceQueryKey)
+      : null) ||
+    (postOwnerId
+      ? findCachedPost(["user-posts", postOwnerId])
+      : null) ||
     findCachedPost(["feed"]) ||
-    findCachedPost(["user-posts"]);
+    findCachedPost(["saved-posts"]) ||
+    findCachedPost(["liked-posts"]) ||
+    findCachedPost(["commented-posts"]);
 
   const currentPost = post
     ? { ...post, ...(cachedPost ?? {}) }
@@ -215,10 +228,10 @@ const PostModal = ({ isOpen, onClose, post }) => {
             <div className="shrink-0 border-t border-zinc-800 px-3 py-2 min-[500px]:px-4 min-[500px]:py-2.5 min-[1000px]:px-5 min-[1000px]:py-3">
               <PostActions
                 post={currentPost}
-                queryKey={[
-                  "user-posts",
-                  profileUserId,
-                ]}
+                queryKey={
+                  sourceQueryKey ??
+                  ["user-posts", profileUserId]
+                }
               />
             </div>
 
