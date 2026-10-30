@@ -1,66 +1,62 @@
-const {parse} = require("cookie");
-const {verifyAccessToken} = require('../utils/jwt')
-const User = require('../models/user.model')
-
+const cookie = require("cookie");
+const { verifyAccessToken } = require("../utils/jwt");
+const User = require("../models/user.model");
 
 const socketAuth = async (socket, next) => {
   try {
     const cookieHeader = socket.handshake.headers.cookie;
 
-    if(!cookiesHeader){
-      return next(new Error("Authentication required"))
+    if (!cookieHeader) {
+      console.error("[socketAuth] Cookie header missing");
+      return next(new Error("Authentication required"));
     }
 
-    const cookies = parse(cookieHeader);
+    const cookies = cookie.parse(cookieHeader);
 
-    const accesToken = cookies.accesToken;
 
-    if(!accessToken){
-      return next(new Error("Authentication required"))
+
+    const accessToken = cookies.accessToken;
+
+    if (!accessToken) {
+      return next(new Error("Authentication required"));
     }
 
     let decoded;
 
+    // 1. Verify the JWT.
     try {
-      decoded = verifyAccessToken(accesToken)
+      decoded = verifyAccessToken(accessToken);
     } catch (error) {
-      if(error.name === "TokenExiredError" || error.name === "JsonWebTokenError" || error.name === "NotBeforeError"){
-        return next(new Error("Authentication failed"));
-      }
-      throw error;
-    }
-
-    if(!decoded?.id){
       return next(new Error("Authentication failed"));
     }
-     /*
-     * Confirm the authenticated user still exists.
-     *
-     * We don't trust the JWT alone for establishing
-     * the application-level socket identity.
-     */
-    const user = await User.findById(decoded.id).select("_id username profileImg isVerified").lean();
 
-    if(!user){
+    // 2. Check the user ID claim.
+    if (!decoded?.id) {
       return next(new Error("Authentication failed"));
     }
-      /*
-     * This becomes the trusted identity for everything
-     * that happens through this socket.
-     *
-     * We NEVER accept senderId from the client.
-     */
+
+    // 3. Confirm that the user exists.
+    const user = await User.findById(decoded.id)
+      .select("_id username profileImg isVerified")
+      .lean();
+
+    if (!user) {
+      return next(new Error("Authentication failed"));
+    }
+
+    // 4. Attach the authenticated identity.
     socket.user = {
       id: user._id.toString(),
       username: user.username,
-      profileImg: user.profileImg, 
+      profileImg: user.profileImg,
       isVerified: user.isVerified,
-    }
+    };
+
     return next();
   } catch (error) {
-    console.error("Socket authentication error: ", error);
+
     return next(new Error("Authentication failed"));
   }
-}
+};
 
 module.exports = socketAuth;

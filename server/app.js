@@ -14,6 +14,9 @@ const userRouter =require("./src/routes/user.route");
 
 const errorHandler =require("./src/middlewares/error.middleware");
 
+const chatRouter =
+  require("./src/routes/chat.route");
+
 const app = express();
 
 app.use(helmet());
@@ -37,6 +40,11 @@ app.use("/api/posts",postRouter);
 app.use("/api/comments",commentRoutes);
 
 app.use("/api/users",userRouter);
+
+app.use(
+  "/api/conversations",
+  chatRouter
+);
 
 /* ERROR HANDLER */
 
