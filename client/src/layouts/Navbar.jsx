@@ -1,16 +1,14 @@
-import React, {
-  useEffect,
-  useRef,
-  useState,
-} from "react";
 
-import { Link } from "react-router-dom";
+import React, { useEffect, useRef, useState } from "react";
+import { Link, useLocation } from "react-router-dom";
 
 import {
   ChevronDown,
   Plus,
   User,
   LogOut,
+  MessageCircle,
+  Heart,
 } from "lucide-react";
 
 import { useAuth } from "../hooks/useAuth";
@@ -20,19 +18,14 @@ import OrbitBrand from "../components/ui/OrbitBrand.jsx";
 
 const Navbar = ({ onOpenModal }) => {
   const { user } = useAuth();
-
-  const {
-    logout,
-    isLoggingOut,
-  } = useLogout();
+  const { logout, isLoggingOut } = useLogout();
 
   const [open, setOpen] = useState(false);
 
   const menuRef = useRef(null);
+  const { pathname } = useLocation();
 
-  /* ========================================
-     CLOSE PROFILE MENU WHEN CLICKING OUTSIDE
-  ======================================== */
+  const isMessagesActive = pathname.startsWith("/messages");
 
   useEffect(() => {
     const handleOutsideClick = (event) => {
@@ -44,320 +37,175 @@ const Navbar = ({ onOpenModal }) => {
       }
     };
 
-    document.addEventListener(
-      "mousedown",
-      handleOutsideClick
-    );
+    document.addEventListener("mousedown", handleOutsideClick);
 
     return () => {
-      document.removeEventListener(
-        "mousedown",
-        handleOutsideClick
-      );
+      document.removeEventListener("mousedown", handleOutsideClick);
     };
   }, []);
-
-  /* ========================================
-     LOGOUT
-  ======================================== */
 
   const handleLogout = async () => {
     try {
       await logout();
       setOpen(false);
     } catch (error) {
-      console.error(
-        "Logout failed:",
-        error
-      );
+      console.error("Logout failed:", error);
     }
   };
 
+  const handleCreatePost = () => {
+    setOpen(false);
+    onOpenModal?.();
+  };
+
   return (
-    <nav
-      className="
-        sticky
-        top-0
-        z-100
-        w-full
-        bg-black
-        border-b
-        border-zinc-800/70
-      "
-    >
+    <nav className="sticky top-0 z-100 w-full border-b border-zinc-800/70 bg-black">
       <div
         className="
-          max-w-6xl
-          mx-auto
-
-          h-16
-          sm:h-17
-
-          px-4
-          sm:px-6
-          lg:px-8
-
-          flex
-          items-center
-          justify-between
-
-          md:grid
-          md:grid-cols-3
+          mx-auto flex h-16 max-w-6xl items-center justify-between
+          px-4 sm:h-17 sm:px-6 lg:px-8
+          md:grid md:grid-cols-3
         "
       >
-{/* ========================================
-    LEFT — ORBIT BRAND
-======================================== */}
+        {/* LEFT — ORBIT BRAND */}
+        <div className="flex justify-start">
+          <Link
+            to="/"
+            aria-label="ORBIT home"
+            className="inline-flex items-center transition-transform duration-400 hover:scale-[1.05]"
+          >
+            <OrbitBrand />
+          </Link>
+        </div>
 
-<div className="flex justify-start">
-  <Link
-    to="/"
-    aria-label="ORBIT home"
-    className="inline-flex items-center transition-transform duration-400 hover:scale-[1.05]"
-  >
-    <OrbitBrand />
-  </Link>
-</div>
-
-        {/* ========================================
-            CENTER — SEARCH
-        ======================================== */}
-
-        <div
-          className="
-            hidden
-            md:flex
-            justify-center
-            w-full
-          "
-        >
+        {/* CENTER — SEARCH */}
+        <div className="hidden w-full justify-center md:flex">
           <SearchBar />
         </div>
 
-        {/* ========================================
-            RIGHT — CREATE + PROFILE
-        ======================================== */}
+        {/* RIGHT — NAVIGATION ACTIONS */}
+        <div className="flex items-center justify-end gap-2 sm:gap-4">
 
-        <div
-          className="
-            flex
-            items-center
-            justify-end
-            gap-2
-            sm:gap-4
-          "
-        >
-          {/* ======================================
-              CREATE POST
-          ====================================== */}
+          {/* DESKTOP MESSAGES */}
+          <Link
+            to="/messages"
+            aria-label="Messages"
+            title="Messages"
+            className={`
+              hidden h-10 w-10 items-center justify-center
+              rounded-full transition-all duration-200
+              active:scale-90 md:flex
+              ${
+                isMessagesActive
+                  ? "bg-zinc-800 text-white"
+                  : "text-zinc-300 hover:bg-zinc-900 hover:text-white"
+              }
+            `}
+          >
+            <MessageCircle size={22} strokeWidth={2} />
+          </Link>
 
+          {/* DESKTOP LIKES */}
           <button
             type="button"
-            onClick={() => {
-              setOpen(false);
-              onOpenModal?.();
-            }}
+            aria-label="Likes"
+            title="Likes"
             className="
-              hidden
-              md:flex
-              items-center
-              justify-center
-
-              w-9
-              h-9
-              sm:w-10
-              sm:h-10
-
-              rounded-full
-
-              text-zinc-200
-
-              hover:bg-zinc-900
-              hover:text-white
-
-              transition-all
-              duration-200
-
-              active:scale-90
+              hidden h-10 w-10 items-center justify-center
+              rounded-full text-zinc-300
+              transition-all duration-200
+              hover:bg-zinc-900 hover:text-white
+              active:scale-90 md:flex
             "
-            aria-label="Create post"
           >
-            <Plus
-              size={24}
-              strokeWidth={2}
-            />
+            <Heart size={22} strokeWidth={2} />
           </button>
 
-          {/* ======================================
-              PROFILE
-          ====================================== */}
-
-          <div
-            ref={menuRef}
-            className="relative"
+          {/* CREATE POST — MOBILE + DESKTOP */}
+          <button
+            type="button"
+            onClick={handleCreatePost}
+            aria-label="Create post"
+            title="Create post"
+            className="
+              flex h-9 w-9 items-center justify-center
+              rounded-full text-zinc-200
+              transition-all duration-200
+              hover:bg-zinc-900 hover:text-white
+              active:scale-90 sm:h-10 sm:w-10
+            "
           >
-            {/* PROFILE BUTTON */}
+            <Plus size={25} strokeWidth={2.2} />
+          </button>
 
+          {/* PROFILE MENU */}
+          <div ref={menuRef} className="relative">
             <button
               type="button"
               onClick={(event) => {
                 event.stopPropagation();
-
-                setOpen(
-                  (prev) => !prev
-                );
+                setOpen((prev) => !prev);
               }}
               className="
-                flex
-                items-center
-                gap-1.5
-                sm:gap-2
-
-                rounded-full
-                p-1.5
-
-                hover:bg-zinc-800
-
-                transition-all
-                duration-200
+                flex items-center gap-1.5 rounded-full p-1.5
+                transition-all duration-200 hover:bg-zinc-800 sm:gap-2
               "
               aria-label="Open profile menu"
               aria-expanded={open}
             >
               <img
                 src={user?.profileImg}
-                alt={
-                  user?.username ||
-                  "Profile"
-                }
+                alt={user?.username || "Profile"}
                 className="
-                  w-8
-                  h-8
-                  sm:w-9
-                  sm:h-9
-
-                  rounded-full
-                  object-cover
-
-                  ring-1
-                  ring-zinc-700
-
-                  shrink-0
+                  h-8 w-8 shrink-0 rounded-full object-cover
+                  ring-1 ring-zinc-700 sm:h-9 sm:w-9
                 "
               />
 
               <ChevronDown
                 size={20}
                 className={`
-                  text-zinc-400
-
-                  transition-transform
-                  duration-200
-
-                  ${
-                    open
-                      ? "rotate-180"
-                      : ""
-                  }
+                  text-zinc-400 transition-transform duration-200
+                  ${open ? "rotate-180" : ""}
                 `}
               />
             </button>
 
-            {/* ====================================
-                DROPDOWN
-            ==================================== */}
-
             {open && (
               <div
-                onClick={(event) =>
-                  event.stopPropagation()
-                }
+                onClick={(event) => event.stopPropagation()}
                 className="
-                  absolute
-                  right-0
-                  top-full
-                  mt-2
-
-                  z-9999
-                  w-48
-
-                  overflow-hidden
-
-                  rounded-xl
-
-                  border
-                  border-zinc-800
-
-                  bg-zinc-950
-
-                  shadow-[0_20px_60px_rgba(0,0,0,0.65)]
+                  absolute right-0 top-full z-9999 mt-2 w-48
+                  overflow-hidden rounded-xl border border-zinc-800
+                  bg-zinc-950 shadow-[0_20px_60px_rgba(0,0,0,0.65)]
                 "
               >
-                {/* PROFILE */}
-
                 <Link
                   to="/profile"
-                  onClick={() =>
-                    setOpen(false)
-                  }
+                  onClick={() => setOpen(false)}
                   className="
-                    flex
-                    items-center
-                    gap-3
-
-                    px-4
-                    py-3
-
-                    text-sm
-                    text-white
-
-                    hover:bg-zinc-900
-
-                    transition-colors
+                    flex items-center gap-3 px-4 py-3 text-sm
+                    text-white transition-colors hover:bg-zinc-900
                   "
                 >
                   <User size={18} />
-
-                  <span>
-                    Profile
-                  </span>
+                  <span>Profile</span>
                 </Link>
-
-                {/* LOGOUT */}
 
                 <button
                   type="button"
                   onClick={handleLogout}
                   disabled={isLoggingOut}
                   className="
-                    w-full
-
-                    flex
-                    items-center
-                    gap-3
-
-                    px-4
-                    py-3
-
-                    text-left
-                    text-sm
-
-                    text-red-500
-
-                    hover:bg-zinc-900
-
-                    transition-colors
-
+                    flex w-full items-center gap-3 px-4 py-3
+                    text-left text-sm text-red-500 transition-colors
+                    hover:bg-zinc-900 disabled:cursor-not-allowed
                     disabled:opacity-50
-                    disabled:cursor-not-allowed
                   "
                 >
                   <LogOut size={18} />
-
                   <span>
-                    {isLoggingOut
-                      ? "Logging out..."
-                      : "Logout"}
+                    {isLoggingOut ? "Logging out..." : "Logout"}
                   </span>
                 </button>
               </div>

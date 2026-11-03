@@ -4,40 +4,21 @@ export const queryKeys = {
   likedPosts: ["liked-posts"],
   commentedPosts: ["commented-posts"],
 
-  profile: (userId) => [
-    "user-profile",
-    userId,
-  ],
+  profile: (userId) => ["user-profile", userId,],
 
-  userPosts: (userId) => [
-    "user-posts",
-    userId,
-  ],
+  userPosts: (userId) => ["user-posts", userId,],
 
-  comments: (postId) => [
-    "comments",
-    postId,
-  ],
+  comments: (postId) => ["comments", postId,],
 
-  followers: (userId) => [
-    "followers",
-    userId,
-  ],
+  followers: (userId) => ["followers", userId,],
 
-  following: (userId) => [
-    "following",
-    userId,
-  ],
+  following: (userId) => ["following", userId,],
 
-  searchUsers: (query) => [
-    "search-users",
-    query,
-  ],
+  searchUsers: (query) => ["search-users", query,],
 
-  usernameAvailability: (
-    username
-  ) => [
-      "username-availability",
-      username,
-    ],
+  usernameAvailability: (username) => ["username-availability", username,],
+
+  conversations: ["conversations"],
+
+  messages: (conversationId) => ["messages", conversationId,],
 };

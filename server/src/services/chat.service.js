@@ -390,13 +390,13 @@ const getMessages = async ({
   const nextCursor =
     hasMore && messages.length > 0
       ? Buffer.from(
-          JSON.stringify({
-            createdAt:
-              messages[messages.length - 1].createdAt,
+        JSON.stringify({
+          createdAt:
+            messages[messages.length - 1].createdAt,
 
-            id: messages[messages.length - 1]._id,
-          })
-        ).toString("base64url")
+          id: messages[messages.length - 1]._id,
+        })
+      ).toString("base64url")
       : null;
 
   /*
@@ -663,83 +663,136 @@ const sendMessage = async ({
    MARK CONVERSATION AS READ
 ===================================================== */
 
-const markConversationAsRead = async ({
-  conversationId,
-  userId,
-  messageId,
-}) => {
+
+const markConversationAsRead = async ({ conversationId, userId, messageId, }) => {
+
+  
+
   const normalizedUserId = normalizeUserId(userId);
 
-  if (
-    !mongoose.Types.ObjectId.isValid(conversationId)
-  ) {
-    throw new ApiError(
-      400,
-      "Invalid conversation ID"
-    );
+  if (!mongoose.Types.ObjectId.isValid(conversationId)) {
+    throw new ApiError(400, "Invalid conversation ID");
   }
 
-  if (
-    !mongoose.Types.ObjectId.isValid(messageId)
-  ) {
-    throw new ApiError(
-      400,
-      "Invalid message ID"
-    );
+  if (!mongoose.Types.ObjectId.isValid(messageId)) {
+    throw new ApiError(400, "Invalid message ID");
   }
 
-  const conversation = await Conversation.findById(
-    conversationId
-  );
+  const session = await mongoose.startSession();
 
-  if (!conversation) {
-    throw new ApiError(
-      404,
-      "Conversation not found"
-    );
+  let result;
+
+  try {
+    await session.withTransaction(async () => {
+      // 1. Load the conversation and verify membership.
+      const conversation = await Conversation.findById(
+        conversationId
+      ).session(session);
+
+      if (!conversation) {
+        throw new ApiError(404, "Conversation not found");
+      }
+
+      if (!isParticipant(conversation, normalizedUserId)) {
+        throw new ApiError(
+          403,
+          "You are not a participant in this conversation"
+        );
+      }
+
+      // 2. Verify that the requested read marker belongs
+      //    to this conversation.
+      const requestedMessage = await Message.findOne({
+        _id: messageId,
+        conversation: conversation._id,
+      }).session(session);
+
+      if (!requestedMessage) {
+        throw new ApiError(404, "Message not found");
+      }
+
+      const participant = getParticipant(
+        conversation,
+        normalizedUserId
+      );
+
+      // 3. Never move the read marker backwards.
+      let effectiveReadMessage = requestedMessage;
+
+      if (participant.lastReadMessage) {
+        const previousReadMessage = await Message.findOne({
+          _id: participant.lastReadMessage,
+          conversation: conversation._id,
+        }).session(session);
+
+        if (previousReadMessage) {
+          const previousIsNewer =
+            previousReadMessage.createdAt >
+            requestedMessage.createdAt ||
+            (
+              previousReadMessage.createdAt.getTime() ===
+              requestedMessage.createdAt.getTime() &&
+              previousReadMessage._id.toString() >
+              requestedMessage._id.toString()
+            );
+
+          if (previousIsNewer) {
+            effectiveReadMessage = previousReadMessage;
+          }
+        }
+      }
+
+      // 4. Count incoming messages newer than the effective
+      //    read marker. Messages sent by this user do not count.
+      const unreadCount = await Message.countDocuments({
+        conversation: conversation._id,
+        sender: { $ne: normalizedUserId },
+        $or: [
+          {
+            createdAt: {
+              $gt: effectiveReadMessage.createdAt,
+            },
+          },
+          {
+            createdAt: effectiveReadMessage.createdAt,
+            _id: {
+              $gt: effectiveReadMessage._id,
+            },
+          },
+        ],
+      }).session(session);
+
+      // 5. Persist the marker and accurate unread count together.
+      await Conversation.updateOne(
+        {
+          _id: conversation._id,
+          "participants.user": normalizedUserId,
+        },
+        {
+          $set: {
+            "participants.$.lastReadMessage":
+              effectiveReadMessage._id,
+            "participants.$.unreadCount": unreadCount,
+          },
+        },
+        { session }
+      );
+
+      result = {
+        conversationId: conversation._id,
+        messageId: effectiveReadMessage._id,
+        unreadCount,
+      };
+    });
+    console.log("📖 MARK READ SUCCESS");
+
+    return result;
+  } finally {
+    await session.endSession();
   }
 
-  // Verify that the authenticated user belongs
-  // to this conversation.
-  if (!isParticipant(conversation, normalizedUserId)) {
-    throw new ApiError(
-      403,
-      "You are not a participant in this conversation"
-    );
-  }
-
-  // Verify the message belongs to this conversation.
-  const message = await Message.findOne({
-    _id: messageId,
-    conversation: conversation._id,
-  });
-
-  if (!message) {
-    throw new ApiError(
-      404,
-      "Message not found"
-    );
-  }
-
-  // Update the authenticated participant's read state.
-  await Conversation.updateOne(
-    {
-      _id: conversation._id,
-      "participants.user": normalizedUserId,
-    },
-    {
-      $set: {
-        "participants.$.lastReadMessage": message._id,
-        "participants.$.unreadCount": 0,
-      },
-    }
-  );
-
-  return {
-    conversationId: conversation._id,
-    messageId: message._id,
-  };
 };
+
 
 /* =====================================================
    EXPORTS

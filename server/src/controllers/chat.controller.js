@@ -83,28 +83,68 @@ const getMessagesController =
    MARK READ
 ===================================================== */
 
-const markConversationAsReadController =
-  asyncHandler(async (req, res) => {
-    const result =
-      await chatService.markConversationAsRead({
-        conversationId:
-          req.params.conversationId,
 
-        userId:
-          req.user.id,
+/* =====================================================
+   MARK READ
+===================================================== */
 
-        messageId:
-          req.body.messageId,
+const markConversationAsReadController = asyncHandler(async (req, res) => {
+    const userId = req.user.id;
+    const conversationId = req.params.conversationId;
+    const messageId = req.body.messageId;
+
+
+    console.log("📖 MARK READ CONTROLLER:", { userId: req.user?.id, conversationId: req.params.conversationId, messageId: req.body?.messageId, });
+
+    // Persist read state first.
+    const result = await chatService.markConversationAsRead({ conversationId, userId, messageId, });
+
+    /*
+     * ========================================
+     * REAL-TIME READ SYNCHRONIZATION
+     * ========================================
+     */
+
+    const io = req.app.get("io");
+
+    if (io) {
+      // Fetch the authorized conversation.
+      const conversation = await chatService.getConversationForUser({ conversationId, userId, });
+
+      const normalizedUserId = String(userId);
+
+      const otherParticipant = conversation.participants.find((participant) => {
+        const participantId = participant.user?._id || participant.user;
+        return String(participantId) !== normalizedUserId;
       });
 
+      const eventPayload = {
+        conversationId: String(conversationId),
+        userId: normalizedUserId,
+        messageId: String(messageId),
+      };
+
+      /*
+       * Notify all devices belonging to the reader.
+       */
+
+      io.to(`user:${normalizedUserId}`).emit("conversation:read", eventPayload);
+
+      /*
+       * Notify the other participant's devices.
+       */
+
+      if (otherParticipant) {
+        const otherUserId = otherParticipant.user?._id || otherParticipant.user;
+        io.to(`user:${String(otherUserId)}`).emit("conversation:read", eventPayload);
+      }
+    }
+
     return res.status(200).json(
-      new ApiResponse(
-        200,
-        "Conversation marked as read",
-        result
-      )
+      new ApiResponse(200, "Conversation marked as read", result)
     );
   });
+
 
 module.exports = {
   getOrCreateDirectConversationController,

@@ -1,3 +1,4 @@
+
 import React from "react";
 
 import Login from "../pages/Login";
@@ -7,27 +8,21 @@ import Profile from "../pages/Profile";
 import ForgotPassword from "../pages/ForgetPassword";
 import ResetPassword from "../pages/ResetPassword";
 import VerifyEmail from "../pages/VerifyEmail";
+import RequestGooglePasswordSetup from "../pages/RequestGooglePasswordSetup";
+import SetupPassword from "../pages/SetupPassword";
+import SavedPosts from "../pages/SavedPosts";
+import Messages from "../pages/Messages";
 
 import ProtectedRoute from "../layouts/ProtectedRoute";
 import PublicRoute from "../layouts/PublicRoute";
 import MainLayout from "../layouts/MainLayout";
 
-import RequestGooglePasswordSetup from "../pages/RequestGooglePasswordSetup";
-import SetupPassword from "../pages/SetupPassword";
-
-import SavedPosts from "../pages/SavedPosts";
-
-import {
-  Route,
-  Routes,
-} from "react-router-dom";
+import { Route, Routes } from "react-router-dom";
 
 const AppRoutes = () => {
   return (
     <Routes>
-
       {/* AUTH */}
-
       <Route
         path="/login"
         element={
@@ -55,12 +50,7 @@ const AppRoutes = () => {
         }
       />
 
-      <Route
-        path="/reset-password"
-        element={
-          <ResetPassword />
-        }
-      />
+      <Route path="/reset-password" element={<ResetPassword />} />
 
       <Route
         path="/setup-password/request"
@@ -71,20 +61,10 @@ const AppRoutes = () => {
         }
       />
 
-      <Route
-        path="/setup-password"
-        element={<SetupPassword />}
-      />
-
-      <Route
-        path="/verify-email"
-        element={
-          <VerifyEmail />
-        }
-      />
+      <Route path="/setup-password" element={<SetupPassword />} />
+      <Route path="/verify-email" element={<VerifyEmail />} />
 
       {/* FEED */}
-
       <Route
         path="/"
         element={
@@ -96,8 +76,7 @@ const AppRoutes = () => {
         }
       />
 
-      {/* OWN PROFILE */}
-
+      {/* PROFILES */}
       <Route
         path="/profile"
         element={
@@ -108,8 +87,6 @@ const AppRoutes = () => {
           </ProtectedRoute>
         }
       />
-
-      {/* PUBLIC USER PROFILE */}
 
       <Route
         path="/profile/:userId"
@@ -122,6 +99,7 @@ const AppRoutes = () => {
         }
       />
 
+      {/* SAVED POSTS */}
       <Route
         path="/saved"
         element={
@@ -133,6 +111,28 @@ const AppRoutes = () => {
         }
       />
 
+      {/* MESSAGES */}
+      <Route
+        path="/messages"
+        element={
+          <ProtectedRoute>
+            <MainLayout>
+              <Messages />
+            </MainLayout>
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/messages/:conversationId"
+        element={
+          <ProtectedRoute>
+            <MainLayout>
+              <Messages />
+            </MainLayout>
+          </ProtectedRoute>
+        }
+      />
     </Routes>
   );
 };
