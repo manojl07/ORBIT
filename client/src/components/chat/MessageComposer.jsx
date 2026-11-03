@@ -1,9 +1,58 @@
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Send } from "lucide-react";
 
-const MessageComposer = ({ onSend, isSending, disabled }) => {
+const TYPING_DEBOUNCE_MS = 1000;
+
+const MessageComposer = ({
+  onSend,
+  onTypingStart,
+  onTypingStop,
+  isSending,
+  disabled,
+}) => {
   const [text, setText] = useState("");
+
+  const typingTimerRef = useRef(null);
+  const isTypingRef = useRef(false);
+
+  const stopTyping = () => {
+    if (typingTimerRef.current) {
+      clearTimeout(typingTimerRef.current);
+      typingTimerRef.current = null;
+    }
+
+    if (isTypingRef.current) {
+      isTypingRef.current = false;
+      onTypingStop?.();
+    }
+  };
+
+  const handleChange = (event) => {
+    const value = event.target.value;
+    console.log("[COMPOSER] Input changed:", value);
+    setText(value);
+
+    if (!value.trim() || disabled) {
+      stopTyping();
+      return;
+    }
+
+    if (!isTypingRef.current) {
+      console.log("[COMPOSER] Calling onTypingStart");
+
+      isTypingRef.current = true;
+      onTypingStart?.();
+    }
+
+    if (typingTimerRef.current) {
+      clearTimeout(typingTimerRef.current);
+    }
+
+    typingTimerRef.current = setTimeout(() => {
+      stopTyping();
+    }, TYPING_DEBOUNCE_MS);
+  };
 
   const handleSubmit = (event) => {
     event.preventDefault();
@@ -12,6 +61,7 @@ const MessageComposer = ({ onSend, isSending, disabled }) => {
 
     if (!trimmedText || isSending || disabled) return;
 
+    stopTyping();
     onSend(trimmedText);
     setText("");
   };
@@ -23,6 +73,24 @@ const MessageComposer = ({ onSend, isSending, disabled }) => {
     }
   };
 
+  useEffect(() => {
+    if (disabled) {
+      stopTyping();
+    }
+  }, [disabled]);
+
+  useEffect(() => {
+    return () => {
+      if (typingTimerRef.current) {
+        clearTimeout(typingTimerRef.current);
+      }
+
+      if (isTypingRef.current) {
+        onTypingStop?.();
+      }
+    };
+  }, [onTypingStop]);
+
   return (
     <form
       onSubmit={handleSubmit}
@@ -30,7 +98,7 @@ const MessageComposer = ({ onSend, isSending, disabled }) => {
     >
       <textarea
         value={text}
-        onChange={(event) => setText(event.target.value)}
+        onChange={handleChange}
         onKeyDown={handleKeyDown}
         placeholder="Message..."
         rows={1}

@@ -1,9 +1,10 @@
-
 import {
   useEffect,
   useMemo,
   useRef,
   useLayoutEffect,
+  useCallback,
+  useState,
 } from "react";
 
 import {
@@ -35,6 +36,92 @@ const ChatWindow = ({ conversation, onBack }) => {
   const queryClient = useQueryClient();
 
   const { user } = useAuth();
+
+  const [typingUser, setTypingUser] = useState(null);
+  const typingTimeoutRef = useRef(null);
+
+  const handleTypingStart = useCallback(() => {
+    console.log("[TYPING] Emitting typing:start", conversation._id);
+
+    if (!socket.connected) {
+      console.log("[TYPING] Socket disconnected");
+      return;
+    }
+
+    socket.emit(
+      "typing:start",
+      { conversationId: conversation._id },
+      (response) => {
+        console.log("[TYPING] Start acknowledgement:", response);
+      }
+    );
+  }, [socket, conversation._id]);
+
+  const handleTypingStop = useCallback(() => {
+    console.log("[TYPING] Emitting typing:stop", conversation._id);
+
+    if (!socket.connected) return;
+
+    socket.emit(
+      "typing:stop",
+      { conversationId: conversation._id },
+      (response) => {
+        console.log("[TYPING] Stop acknowledgement:", response);
+      }
+    );
+  }, [socket, conversation._id]);
+
+  useEffect(() => {
+    const conversationId = String(conversation._id);
+    const currentUserId = String(user?.id || user?._id);
+
+    const clearTypingTimeout = () => {
+      if (typingTimeoutRef.current) {
+        clearTimeout(typingTimeoutRef.current);
+        typingTimeoutRef.current = null;
+      }
+    };
+
+    console.log("[TYPING] Listener mounted:", { socketId: socket.id, connected: socket.connected, conversationId, currentUserId, });
+
+    const handleTypingUpdate = (payload) => {
+      if (String(payload?.conversationId) !== conversationId || String(payload?.userId) === currentUserId) {
+        console.log("[TYPING] Event ignored by filter");
+        return;
+      }
+
+      clearTypingTimeout();
+
+      if (!payload?.isTyping) {
+        setTypingUser(null);
+        return;
+      }
+
+      setTypingUser(payload.username || otherUser?.username || "Someone");
+
+      // Safety fallback if a stop event is missed.
+      typingTimeoutRef.current = setTimeout(() => {
+        setTypingUser(null);
+      }, 6000);
+    };
+
+    const handleDisconnect = () => {
+      console.log("[TYPING] Socket disconnected");
+      clearTypingTimeout();
+      setTypingUser(null);
+    };
+
+    socket.on("typing:update", handleTypingUpdate);
+    socket.on("disconnect", handleDisconnect);
+
+    return () => {
+      socket.off("typing:update", handleTypingUpdate);
+      socket.off("disconnect", handleDisconnect);
+
+      clearTypingTimeout();
+      setTypingUser(null);
+    };
+  }, [socket, conversation._id, user, otherUser?.username]);
 
   // Scroll container and initial positioning.
   const messagesContainerRef = useRef(null);
@@ -163,7 +250,7 @@ const ChatWindow = ({ conversation, onBack }) => {
 
       if (
         String(senderId) ===
-          String(user?.id || user?._id) &&
+        String(user?.id || user?._id) &&
         message.status !== "failed" &&
         !String(message._id).startsWith("optimistic-")
       ) {
@@ -247,7 +334,7 @@ const ChatWindow = ({ conversation, onBack }) => {
       if (
         !incomingMessage ||
         String(incomingMessage.conversation) !==
-          String(conversationId)
+        String(conversationId)
       ) {
         return;
       }
@@ -261,11 +348,11 @@ const ChatWindow = ({ conversation, onBack }) => {
           page.messages?.some(
             (message) =>
               String(message._id) ===
-                String(incomingMessage._id) ||
+              String(incomingMessage._id) ||
               (
                 incomingMessage.clientMessageId &&
                 message.clientMessageId ===
-                  incomingMessage.clientMessageId
+                incomingMessage.clientMessageId
               )
           )
         );
@@ -279,11 +366,11 @@ const ChatWindow = ({ conversation, onBack }) => {
                 (message) => {
                   const isMatch =
                     String(message._id) ===
-                      String(incomingMessage._id) ||
+                    String(incomingMessage._id) ||
                     (
                       incomingMessage.clientMessageId &&
                       message.clientMessageId ===
-                        incomingMessage.clientMessageId
+                      incomingMessage.clientMessageId
                     );
 
                   return isMatch
@@ -397,9 +484,19 @@ const ChatWindow = ({ conversation, onBack }) => {
               {otherUser?.username || "Unknown user"}
             </h2>
 
-            <p className="mt-0.5 text-xs text-zinc-500">
-              ORBIT conversation
-            </p>
+            <div className="mt-0.5 h-4">
+              {typingUser ? (
+                <p className="flex items-center gap-1.5 text-xs text-emerald-400">
+                  <span>{typingUser} is typing</span>
+
+                  <span className="flex items-center gap-0.5">
+                    <span className="h-1 w-1 animate-bounce rounded-full bg-emerald-400 [animation-delay:-0.3s]" />
+                    <span className="h-1 w-1 animate-bounce rounded-full bg-emerald-400 [animation-delay:-0.15s]" />
+                    <span className="h-1 w-1 animate-bounce rounded-full bg-emerald-400" />
+                  </span>
+                </p>
+              ) : (<p className="text-xs text-zinc-500">ORBIT conversation</p>)}
+            </div>
           </div>
         </div>
 
@@ -503,6 +600,8 @@ const ChatWindow = ({ conversation, onBack }) => {
       <div className="shrink-0 border-t border-zinc-800 p-3 sm:p-4">
         <MessageComposer
           onSend={handleSendMessage}
+          onTypingStart={handleTypingStart}
+          onTypingStop={handleTypingStop}
           isSending={sendMessage.isPending}
           disabled={
             isLoading ||

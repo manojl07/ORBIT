@@ -1,204 +1,334 @@
-const chatService =
-  require("../services/chat.service");
 
-const socketAuth =
-  require("./socketAuth");
+const chatService = require("../services/chat.service");
+const socketAuth = require("./socketAuth");
 
-const USER_ROOM_PREFIX =
-  "user:";
+const USER_ROOM_PREFIX = "user:";
+const CONVERSATION_ROOM_PREFIX = "conversation:";
 
-const CONVERSATION_ROOM_PREFIX =
-  "conversation:";
+const TYPING_TIMEOUT_MS = 5000;
 
 const getUserRoom = (userId) => {
   return `${USER_ROOM_PREFIX}${userId}`;
 };
 
-const getConversationRoom =
-  (conversationId) => {
-    return `${CONVERSATION_ROOM_PREFIX}${conversationId}`;
-  };
+const getConversationRoom = (conversationId) => {
+  return `${CONVERSATION_ROOM_PREFIX}${conversationId}`;
+};
 
-const emitChatError = (
+const emitChatError = (socket, error) => {
+  socket.emit("chat:error", {
+    message: error?.message || "Chat operation failed",
+  });
+};
+
+// Track typing independently for every socket and conversation.
+const typingSessions = new Map();
+
+const getTypingKey = (socketId, conversationId) =>
+  `${socketId}:${conversationId}`;
+
+const clearTypingSession = (
+  io,
   socket,
-  error
+  conversationId,
+  notify = true
 ) => {
-  socket.emit(
-    "chat:error",
-    {
-      message:
-        error?.message ||
-        "Chat operation failed",
-    }
-  );
+  const key = getTypingKey(socket.id, conversationId);
+  const session = typingSessions.get(key);
+
+  if (!session) return;
+
+  clearTimeout(session.timeout);
+  typingSessions.delete(key);
+
+  if (notify) {
+    console.log("⌨️ BROADCASTING TYPING STOP TO:", session.recipientId);
+
+    io.to(getUserRoom(session.recipientId)).emit(
+      "typing:update",
+      {
+        conversationId,
+        userId: socket.user.id,
+        username: socket.user.username,
+        isTyping: false,
+      }
+    );
+  }
 };
 
 const initializeSocket = (io) => {
-  /*
-   * ==========================================
-   * SOCKET AUTH
-   * ==========================================
-   */
-
   io.use(socketAuth);
 
-  /*
-   * ==========================================
-   * CONNECTION
-   * ==========================================
-   */
-
   io.on("connection", (socket) => {
-    const userId =
-      socket.user.id;
+    const userId = socket.user.id;
 
-    /*
-     * Every authenticated device/socket
-     * joins its user room.
-     */
-
-    socket.join(
-      getUserRoom(userId)
-    );
+    socket.join(getUserRoom(userId));
 
     console.log(
       `🔌 Socket connected: ${socket.id} | user: ${userId}`
     );
 
-    socket.emit(
-      "socket:ready",
-      {
-        socketId:
-          socket.id,
+    socket.emit("socket:ready", {
+      socketId: socket.id,
+      userId,
+    });
 
-        userId,
-      }
-    );
-
-    /* =================================================
-       JOIN CONVERSATION
-    ================================================= */
+    /*
+     * ==========================================
+     * JOIN CONVERSATION
+     * ==========================================
+     */
 
     socket.on(
       "conversation:join",
-      async (
-        payload,
-        acknowledgement
-      ) => {
+      async (payload, acknowledgement) => {
         try {
-          const conversationId =
-            payload?.conversationId;
+          const conversationId = payload?.conversationId;
 
           const conversation =
-            await chatService.getConversationForUser(
-              {
-                conversationId,
-                userId,
-              }
-            );
+            await chatService.getConversationForUser({
+              conversationId,
+              userId,
+            });
 
-          const room =
-            getConversationRoom(
-              conversation._id
-            );
+          const room = getConversationRoom(conversation._id);
 
           socket.join(room);
 
           const response = {
-            conversationId:
-              conversation._id.toString(),
+            conversationId: conversation._id.toString(),
           };
 
-          socket.emit(
-            "conversation:joined",
-            response
-          );
+          socket.emit("conversation:joined", response);
 
           acknowledgement?.({
             success: true,
             data: response,
           });
         } catch (error) {
-          console.error(
-            "conversation:join error:",
-            error
-          );
+          console.error("conversation:join error:", error);
 
-          emitChatError(
-            socket,
-            error
-          );
+          emitChatError(socket, error);
 
           acknowledgement?.({
             success: false,
-            message:
-              error.message,
+            message: error.message,
           });
         }
       }
     );
 
-    /* =================================================
-       LEAVE CONVERSATION
-    ================================================= */
+    /*
+     * ==========================================
+     * LEAVE CONVERSATION
+     * ==========================================
+     */
 
     socket.on(
       "conversation:leave",
-      async (
-        payload,
-        acknowledgement
-      ) => {
+      async (payload, acknowledgement) => {
         try {
-          const conversationId =
-            payload?.conversationId;
+          const conversationId = payload?.conversationId;
 
-          /*
-           * We still verify membership
-           * before acting on the room.
-           */
           const conversation =
-            await chatService.getConversationForUser(
-              {
-                conversationId,
-                userId,
-              }
-            );
+            await chatService.getConversationForUser({
+              conversationId,
+              userId,
+            });
 
-          const room =
-            getConversationRoom(
-              conversation._id
-            );
+          const normalizedConversationId =
+            conversation._id.toString();
 
-          socket.leave(room);
+          // Clear typing before leaving.
+          clearTypingSession(
+            io,
+            socket,
+            normalizedConversationId
+          );
+
+          socket.leave(
+            getConversationRoom(normalizedConversationId)
+          );
 
           acknowledgement?.({
             success: true,
           });
         } catch (error) {
-          console.error(
-            "conversation:leave error:",
-            error
-          );
+          console.error("conversation:leave error:", error);
 
           acknowledgement?.({
             success: false,
-            message:
-              error.message,
+            message: error.message,
           });
         }
       }
     );
 
-    /* =================================================
-       SEND MESSAGE
-    ================================================= */
+    /*
+     * ==========================================
+     * TYPING START
+     * ==========================================
+     */
+
+
+    socket.on(
+      "typing:start",
+      async (payload, acknowledgement) => {
+        try {
+          const conversationId = payload?.conversationId;
+
+          // DEBUG: Confirm the frontend event reached the backend.
+          console.log("⌨️ TYPING START RECEIVED:", {
+            socketId: socket.id,
+            userId,
+            conversationId,
+          });
+
+          const conversation =
+            await chatService.getConversationForUser({
+              conversationId,
+              userId,
+            });
+
+          const normalizedConversationId =
+            conversation._id.toString();
+
+          // Only allow typing from a joined conversation.
+          const room = getConversationRoom(
+            normalizedConversationId
+          );
+
+          if (!socket.rooms.has(room)) {
+            throw new Error(
+              "Join the conversation before sending typing events"
+            );
+          }
+
+          // Find the other participant.
+          const recipient = conversation.participants.find(
+            (participant) => {
+              const participantId =
+                participant.user?._id || participant.user;
+
+              return String(participantId) !== userId;
+            }
+          );
+
+          if (!recipient) {
+            throw new Error("Conversation recipient not found");
+          }
+
+          const recipientId = String(
+            recipient.user?._id || recipient.user
+          );
+
+          const key = getTypingKey(
+            socket.id,
+            normalizedConversationId
+          );
+
+          const existingSession = typingSessions.get(key);
+
+          // Refresh inactivity timeout without repeatedly
+          // broadcasting typing:start.
+          if (existingSession) {
+            clearTimeout(existingSession.timeout);
+          }
+
+          const timeout = setTimeout(() => {
+            clearTypingSession(
+              io,
+              socket,
+              normalizedConversationId
+            );
+          }, TYPING_TIMEOUT_MS);
+
+          typingSessions.set(key, {
+            recipientId,
+            timeout,
+          });
+
+          // Broadcast only when this socket starts typing.
+          if (!existingSession) {
+            const recipientRoom = getUserRoom(recipientId);
+
+            // DEBUG: Inspect recipient's connected sockets.
+            console.log("⌨️ RECIPIENT ROOM DEBUG:", {
+              recipientRoom,
+              recipientId,
+              connectedSockets: [
+                ...(io.sockets.adapter.rooms.get(recipientRoom) || []),
+              ],
+            });
+
+            console.log(
+              "⌨️ BROADCASTING TYPING TO:",
+              recipientId
+            );
+
+            io.to(recipientRoom).emit("typing:update", {
+              conversationId: normalizedConversationId,
+              userId,
+              username: socket.user.username,
+              isTyping: true,
+            });
+          }
+
+          acknowledgement?.({
+            success: true,
+          });
+        } catch (error) {
+          console.error("❌ typing:start error:", error);
+
+          emitChatError(socket, error);
+
+          acknowledgement?.({
+            success: false,
+            message: error.message,
+          });
+        }
+      }
+    );
+
+
+    /*
+     * ==========================================
+     * TYPING STOP
+     * ==========================================
+     */
+
+    socket.on("typing:stop", async (payload, acknowledgement) => {
+      try {
+        const conversationId = payload?.conversationId;
+
+        // DEBUG: Confirm the stop event reached the backend.
+        console.log("⌨️ TYPING STOP RECEIVED:", { socketId: socket.id, userId, conversationId, });
+
+        const conversation = await chatService.getConversationForUser({ conversationId, userId, });
+
+        const normalizedConversationId = conversation._id.toString();
+        clearTypingSession(io, socket, normalizedConversationId);
+
+        acknowledgement?.({ success: true, });
+      } catch (error) {
+        console.error("❌ typing:stop error:", error);
+
+        emitChatError(socket, error);
+
+        acknowledgement?.({ success: false, message: error.message, });
+      }
+    }
+    );
+
+    /*
+     * ==========================================
+     * SEND MESSAGE
+     * ==========================================
+     */
 
     socket.on(
       "message:send",
-      async (
-        payload,
-        acknowledgement
-      ) => {
+      async (payload, acknowledgement) => {
         try {
           const {
             conversationId,
@@ -206,149 +336,104 @@ const initializeSocket = (io) => {
             text,
           } = payload || {};
 
-          /*
-           * IMPORTANT:
-           *
-           * senderId is NEVER read from payload.
-           *
-           * The authenticated socket identity
-           * is the sender.
-           */
+          const result = await chatService.sendMessage({
+            conversationId,
+            senderId: socket.user.id,
+            clientMessageId,
+            text,
+          });
 
-          const result =
-            await chatService.sendMessage({
-              conversationId,
+          const message = result.message;
 
-              senderId:
-                socket.user.id,
+          const room = getConversationRoom(conversationId);
 
-              clientMessageId,
-
-              text,
-            });
-
-          const message =
-            result.message;
-
-          const room =
-            getConversationRoom(
-              conversationId
-            );
-
-          /*
-           * Acknowledge the sender.
-           *
-           * The client uses this to replace
-           * its optimistic temporary message.
-           */
           acknowledgement?.({
             success: true,
-
             data: {
               message,
-
-              duplicate:
-                result.duplicate,
+              duplicate: result.duplicate,
             },
           });
 
-          /*
-           * If this was a retry of a message
-           * already persisted, don't broadcast
-           * it again.
-           */
-          if (result.duplicate) {
-            return;
-          }
+          if (result.duplicate) return;
 
-          /*
-           * Broadcast only AFTER the database
-           * transaction has committed.
-           *
-           * Sender also receives message:new.
-           * This keeps all connected devices
-           * synchronized.
-           */
-          io.to(room).emit(
-            "message:new",
-            {
-              message,
+          // Stop typing when a message is sent.
+          clearTypingSession(
+            io,
+            socket,
+            String(conversationId)
+          );
+
+          io.to(room).emit("message:new", {
+            message,
+          });
+
+          const conversation =
+            await chatService.getConversationForUser({
+              conversationId,
+              userId: socket.user.id,
+            });
+
+          const recipient = conversation.participants.find(
+            (participant) => {
+              const participantId =
+                participant.user?._id || participant.user;
+
+              return String(participantId) !== userId;
             }
           );
 
-          /*
-           * Notify the recipient's user room.
-           *
-           * This is useful for inbox/unread
-           * synchronization even when the
-           * recipient isn't inside the conversation.
-           */
-
-          const conversation =
-            await chatService.getConversationForUser(
-              {
-                conversationId,
-                userId:
-                  socket.user.id,
-              }
-            );
-
-          const recipient =
-            conversation.participants.find(
-              (participant) =>
-                participant.user._id
-                  .toString() !==
-                socket.user.id
-            );
-
           if (recipient) {
-            io.to(
-              getUserRoom(
-                recipient.user._id
-              )
-            ).emit(
+            const recipientId =
+              recipient.user?._id || recipient.user;
+
+            io.to(getUserRoom(recipientId)).emit(
               "conversation:updated",
               {
-                conversationId:
-                  conversation._id,
-
+                conversationId: conversation._id,
                 message,
               }
             );
           }
         } catch (error) {
-          console.error(
-            "message:send error:",
-            error
-          );
+          console.error("message:send error:", error);
 
-          emitChatError(
-            socket,
-            error
-          );
+          emitChatError(socket, error);
 
           acknowledgement?.({
             success: false,
-
-            message:
-              error.message,
+            message: error.message,
           });
         }
       }
     );
 
-    /* =================================================
-       DISCONNECT
-    ================================================= */
+    /*
+     * ==========================================
+     * DISCONNECT
+     * ==========================================
+     */
 
-    socket.on(
-      "disconnect",
-      (reason) => {
-        console.log(
-          `🔌 Socket disconnected: ${socket.id} | user: ${userId} | reason: ${reason}`
-        );
+    socket.on("disconnect", () => {
+      // Clear every typing session belonging to this socket.
+      for (const [key] of typingSessions) {
+        if (key.startsWith(`${socket.id}:`)) {
+          const conversationId = key.slice(
+            socket.id.length + 1
+          );
+
+          clearTypingSession(
+            io,
+            socket,
+            conversationId
+          );
+        }
       }
-    );
+
+      console.log(
+        `🔌 Socket disconnected: ${socket.id} | user: ${userId}`
+      );
+    });
   });
 };
 
