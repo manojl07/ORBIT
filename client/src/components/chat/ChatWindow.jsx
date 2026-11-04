@@ -18,6 +18,7 @@ import { useQueryClient } from "@tanstack/react-query";
 
 import useMessages from "../../hooks/useMessages";
 import useSendMessage from "../../hooks/useSendMessage";
+import usePresence from "../../hooks/usePresence";
 import { useAuth } from "../../hooks/useAuth";
 import { useSocket } from "../../context/SocketContext";
 import { queryKeys } from "../../constants/queryKey";
@@ -36,6 +37,15 @@ const ChatWindow = ({ conversation, onBack }) => {
   const queryClient = useQueryClient();
 
   const { user } = useAuth();
+  const { data: presenceByUser = {} } = usePresence();
+
+  const otherUserId = String(
+    otherUser?._id || otherUser?.id || ""
+  );
+
+  const presenceStatus = otherUserId
+    ? presenceByUser[otherUserId]
+    : undefined;
 
   const [typingUser, setTypingUser] = useState(null);
   const typingTimeoutRef = useRef(null);
@@ -495,7 +505,15 @@ const ChatWindow = ({ conversation, onBack }) => {
                     <span className="h-1 w-1 animate-bounce rounded-full bg-emerald-400" />
                   </span>
                 </p>
-              ) : (<p className="text-xs text-zinc-500">ORBIT conversation</p>)}
+              ) : presenceStatus === true ? (
+                <p className="text-xs text-emerald-400">Online</p>
+              ) : presenceStatus === false ? (
+                <p className="text-xs text-zinc-500">Offline</p>
+              ) : (
+                <p className="text-xs text-zinc-500">
+                  Checking availability...
+                </p>
+              )}
             </div>
           </div>
         </div>

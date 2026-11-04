@@ -20,5 +20,7 @@ export const queryKeys = {
 
   conversations: ["conversations"],
 
+  presence: ["presence"],
+
   messages: (conversationId) => ["messages", conversationId,],
 };

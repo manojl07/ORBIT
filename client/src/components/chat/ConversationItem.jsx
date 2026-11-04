@@ -33,6 +33,7 @@ const formatConversationTime = (date) => {
 
 const ConversationItem = ({
   conversation,
+  presenceStatus,
   active,
   onClick,
 }) => {
@@ -74,6 +75,14 @@ const ConversationItem = ({
           <span className="absolute -right-0.5 -bottom-0.5 flex h-4 w-4 items-center justify-center rounded-full border-2 border-black bg-blue-500 text-[9px] font-bold text-white">
             ✓
           </span>
+        )}
+
+        {presenceStatus === true && (
+          <span
+            aria-label="Online"
+            title="Online"
+            className="absolute -bottom-0.5 -left-0.5 h-3.5 w-3.5 rounded-full border-2 border-black bg-emerald-500"
+          />
         )}
       </div>
 

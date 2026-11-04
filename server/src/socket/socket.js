@@ -4,8 +4,49 @@ const socketAuth = require("./socketAuth");
 
 const USER_ROOM_PREFIX = "user:";
 const CONVERSATION_ROOM_PREFIX = "conversation:";
+const PRESENCE_ROOM_PREFIX = "presence:";
 
 const TYPING_TIMEOUT_MS = 5000;
+
+// userId -> Set of socketIds
+const onlineUsers = new Map();
+
+const getPresenceRoom = (userId) =>
+  `${PRESENCE_ROOM_PREFIX}${userId}`;
+
+const addOnlineSocket = (userId, socketId) => {
+  let sockets = onlineUsers.get(userId);
+
+  const wasOffline = !sockets || sockets.size === 0;
+
+  if (!sockets) {
+    sockets = new Set();
+    onlineUsers.set(userId, sockets);
+  }
+
+  sockets.add(socketId);
+
+  return wasOffline;
+};
+
+const removeOnlineSocket = (userId, socketId) => {
+  const sockets = onlineUsers.get(userId);
+
+  if (!sockets) return false;
+
+  sockets.delete(socketId);
+
+  if (sockets.size === 0) {
+    onlineUsers.delete(userId);
+    return true;
+  }
+
+  return false;
+};
+
+const isUserOnline = (userId) => {
+  return (onlineUsers.get(String(userId))?.size || 0) > 0;
+};
 
 const getUserRoom = (userId) => {
   return `${USER_ROOM_PREFIX}${userId}`;
@@ -64,14 +105,15 @@ const initializeSocket = (io) => {
 
     socket.join(getUserRoom(userId));
 
-    console.log(
-      `🔌 Socket connected: ${socket.id} | user: ${userId}`
-    );
+    const becameOnline = addOnlineSocket(userId, socket.id);
 
-    socket.emit("socket:ready", {
-      socketId: socket.id,
-      userId,
-    });
+    if (becameOnline) {
+      io.to(getPresenceRoom(userId)).emit("presence:update", { userId, isOnline: true, });
+    }
+
+    console.log(`🔌 Socket connected: ${socket.id} | user: ${userId}`);
+
+    socket.emit("socket:ready", { socketId: socket.id, userId, });
 
     /*
      * ==========================================
@@ -79,43 +121,105 @@ const initializeSocket = (io) => {
      * ==========================================
      */
 
-    socket.on(
-      "conversation:join",
-      async (payload, acknowledgement) => {
-        try {
-          const conversationId = payload?.conversationId;
+    socket.on("conversation:join", async (payload, acknowledgement) => {
+      try {
+        const conversationId = payload?.conversationId;
 
+        const conversation =
+          await chatService.getConversationForUser({
+            conversationId,
+            userId,
+          });
+
+        const room = getConversationRoom(conversation._id);
+
+        socket.join(room);
+
+        const response = {
+          conversationId: conversation._id.toString(),
+        };
+
+        socket.emit("conversation:joined", response);
+
+        acknowledgement?.({
+          success: true,
+          data: response,
+        });
+      } catch (error) {
+        console.error("conversation:join error:", error);
+
+        emitChatError(socket, error);
+
+        acknowledgement?.({
+          success: false,
+          message: error.message,
+        });
+      }
+    }
+    );
+
+
+    socket.on("presence:watch", async (payload, acknowledgement) => {
+      try {
+        const conversationIds = payload?.conversationIds;
+
+        if (
+          !Array.isArray(conversationIds) ||
+          conversationIds.length > 100
+        ) {
+          throw new Error("Invalid conversation IDs");
+        }
+
+        const presence = [];
+
+        for (const conversationId of new Set(conversationIds)) {
           const conversation =
             await chatService.getConversationForUser({
               conversationId,
               userId,
             });
 
-          const room = getConversationRoom(conversation._id);
+          const otherParticipant =
+            conversation.participants.find((participant) => {
+              const participantId =
+                participant.user?._id || participant.user;
 
-          socket.join(room);
+              return String(participantId) !== userId;
+            });
 
-          const response = {
+          if (!otherParticipant) {
+            continue;
+          }
+
+          const otherUserId = String(
+            otherParticipant.user?._id ||
+            otherParticipant.user
+          );
+
+          // Subscribe this socket to the other participant's
+          // presence updates.
+          socket.join(getPresenceRoom(otherUserId));
+
+          presence.push({
             conversationId: conversation._id.toString(),
-          };
-
-          socket.emit("conversation:joined", response);
-
-          acknowledgement?.({
-            success: true,
-            data: response,
-          });
-        } catch (error) {
-          console.error("conversation:join error:", error);
-
-          emitChatError(socket, error);
-
-          acknowledgement?.({
-            success: false,
-            message: error.message,
+            userId: otherUserId,
+            isOnline: isUserOnline(otherUserId),
           });
         }
+
+        acknowledgement?.({
+          success: true,
+          data: presence,
+        });
+      } catch (error) {
+        console.error("presence:watch error:", error);
+
+        acknowledgement?.({
+          success: false,
+          message: error.message,
+        });
       }
+    }
     );
 
     /*
@@ -124,44 +228,42 @@ const initializeSocket = (io) => {
      * ==========================================
      */
 
-    socket.on(
-      "conversation:leave",
-      async (payload, acknowledgement) => {
-        try {
-          const conversationId = payload?.conversationId;
+    socket.on("conversation:leave", async (payload, acknowledgement) => {
+      try {
+        const conversationId = payload?.conversationId;
 
-          const conversation =
-            await chatService.getConversationForUser({
-              conversationId,
-              userId,
-            });
-
-          const normalizedConversationId =
-            conversation._id.toString();
-
-          // Clear typing before leaving.
-          clearTypingSession(
-            io,
-            socket,
-            normalizedConversationId
-          );
-
-          socket.leave(
-            getConversationRoom(normalizedConversationId)
-          );
-
-          acknowledgement?.({
-            success: true,
+        const conversation =
+          await chatService.getConversationForUser({
+            conversationId,
+            userId,
           });
-        } catch (error) {
-          console.error("conversation:leave error:", error);
 
-          acknowledgement?.({
-            success: false,
-            message: error.message,
-          });
-        }
+        const normalizedConversationId =
+          conversation._id.toString();
+
+        // Clear typing before leaving.
+        clearTypingSession(
+          io,
+          socket,
+          normalizedConversationId
+        );
+
+        socket.leave(
+          getConversationRoom(normalizedConversationId)
+        );
+
+        acknowledgement?.({
+          success: true,
+        });
+      } catch (error) {
+        console.error("conversation:leave error:", error);
+
+        acknowledgement?.({
+          success: false,
+          message: error.message,
+        });
       }
+    }
     );
 
     /*
@@ -171,123 +273,121 @@ const initializeSocket = (io) => {
      */
 
 
-    socket.on(
-      "typing:start",
-      async (payload, acknowledgement) => {
-        try {
-          const conversationId = payload?.conversationId;
+    socket.on("typing:start", async (payload, acknowledgement) => {
+      try {
+        const conversationId = payload?.conversationId;
 
-          // DEBUG: Confirm the frontend event reached the backend.
-          console.log("⌨️ TYPING START RECEIVED:", {
-            socketId: socket.id,
-            userId,
+        // DEBUG: Confirm the frontend event reached the backend.
+        console.log("⌨️ TYPING START RECEIVED:", {
+          socketId: socket.id,
+          userId,
+          conversationId,
+        });
+
+        const conversation =
+          await chatService.getConversationForUser({
             conversationId,
+            userId,
           });
 
-          const conversation =
-            await chatService.getConversationForUser({
-              conversationId,
-              userId,
-            });
+        const normalizedConversationId =
+          conversation._id.toString();
 
-          const normalizedConversationId =
-            conversation._id.toString();
+        // Only allow typing from a joined conversation.
+        const room = getConversationRoom(
+          normalizedConversationId
+        );
 
-          // Only allow typing from a joined conversation.
-          const room = getConversationRoom(
+        if (!socket.rooms.has(room)) {
+          throw new Error(
+            "Join the conversation before sending typing events"
+          );
+        }
+
+        // Find the other participant.
+        const recipient = conversation.participants.find(
+          (participant) => {
+            const participantId =
+              participant.user?._id || participant.user;
+
+            return String(participantId) !== userId;
+          }
+        );
+
+        if (!recipient) {
+          throw new Error("Conversation recipient not found");
+        }
+
+        const recipientId = String(
+          recipient.user?._id || recipient.user
+        );
+
+        const key = getTypingKey(
+          socket.id,
+          normalizedConversationId
+        );
+
+        const existingSession = typingSessions.get(key);
+
+        // Refresh inactivity timeout without repeatedly
+        // broadcasting typing:start.
+        if (existingSession) {
+          clearTimeout(existingSession.timeout);
+        }
+
+        const timeout = setTimeout(() => {
+          clearTypingSession(
+            io,
+            socket,
             normalizedConversationId
           );
+        }, TYPING_TIMEOUT_MS);
 
-          if (!socket.rooms.has(room)) {
-            throw new Error(
-              "Join the conversation before sending typing events"
-            );
-          }
+        typingSessions.set(key, {
+          recipientId,
+          timeout,
+        });
 
-          // Find the other participant.
-          const recipient = conversation.participants.find(
-            (participant) => {
-              const participantId =
-                participant.user?._id || participant.user;
+        // Broadcast only when this socket starts typing.
+        if (!existingSession) {
+          const recipientRoom = getUserRoom(recipientId);
 
-              return String(participantId) !== userId;
-            }
-          );
-
-          if (!recipient) {
-            throw new Error("Conversation recipient not found");
-          }
-
-          const recipientId = String(
-            recipient.user?._id || recipient.user
-          );
-
-          const key = getTypingKey(
-            socket.id,
-            normalizedConversationId
-          );
-
-          const existingSession = typingSessions.get(key);
-
-          // Refresh inactivity timeout without repeatedly
-          // broadcasting typing:start.
-          if (existingSession) {
-            clearTimeout(existingSession.timeout);
-          }
-
-          const timeout = setTimeout(() => {
-            clearTypingSession(
-              io,
-              socket,
-              normalizedConversationId
-            );
-          }, TYPING_TIMEOUT_MS);
-
-          typingSessions.set(key, {
+          // DEBUG: Inspect recipient's connected sockets.
+          console.log("⌨️ RECIPIENT ROOM DEBUG:", {
+            recipientRoom,
             recipientId,
-            timeout,
+            connectedSockets: [
+              ...(io.sockets.adapter.rooms.get(recipientRoom) || []),
+            ],
           });
 
-          // Broadcast only when this socket starts typing.
-          if (!existingSession) {
-            const recipientRoom = getUserRoom(recipientId);
+          console.log(
+            "⌨️ BROADCASTING TYPING TO:",
+            recipientId
+          );
 
-            // DEBUG: Inspect recipient's connected sockets.
-            console.log("⌨️ RECIPIENT ROOM DEBUG:", {
-              recipientRoom,
-              recipientId,
-              connectedSockets: [
-                ...(io.sockets.adapter.rooms.get(recipientRoom) || []),
-              ],
-            });
-
-            console.log(
-              "⌨️ BROADCASTING TYPING TO:",
-              recipientId
-            );
-
-            io.to(recipientRoom).emit("typing:update", {
-              conversationId: normalizedConversationId,
-              userId,
-              username: socket.user.username,
-              isTyping: true,
-            });
-          }
-
-          acknowledgement?.({
-            success: true,
-          });
-        } catch (error) {
-          console.error("❌ typing:start error:", error);
-
-          emitChatError(socket, error);
-
-          acknowledgement?.({
-            success: false,
-            message: error.message,
+          io.to(recipientRoom).emit("typing:update", {
+            conversationId: normalizedConversationId,
+            userId,
+            username: socket.user.username,
+            isTyping: true,
           });
         }
+
+        acknowledgement?.({
+          success: true,
+        });
+      } catch (error) {
+        console.error("❌ typing:start error:", error);
+
+        emitChatError(socket, error);
+
+        acknowledgement?.({
+          success: false,
+          message: error.message,
+        });
       }
+    }
     );
 
 
@@ -326,86 +426,84 @@ const initializeSocket = (io) => {
      * ==========================================
      */
 
-    socket.on(
-      "message:send",
-      async (payload, acknowledgement) => {
-        try {
-          const {
-            conversationId,
-            clientMessageId,
-            text,
-          } = payload || {};
+    socket.on("message:send", async (payload, acknowledgement) => {
+      try {
+        const {
+          conversationId,
+          clientMessageId,
+          text,
+        } = payload || {};
 
-          const result = await chatService.sendMessage({
-            conversationId,
-            senderId: socket.user.id,
-            clientMessageId,
-            text,
-          });
+        const result = await chatService.sendMessage({
+          conversationId,
+          senderId: socket.user.id,
+          clientMessageId,
+          text,
+        });
 
-          const message = result.message;
+        const message = result.message;
 
-          const room = getConversationRoom(conversationId);
+        const room = getConversationRoom(conversationId);
 
-          acknowledgement?.({
-            success: true,
-            data: {
-              message,
-              duplicate: result.duplicate,
-            },
-          });
-
-          if (result.duplicate) return;
-
-          // Stop typing when a message is sent.
-          clearTypingSession(
-            io,
-            socket,
-            String(conversationId)
-          );
-
-          io.to(room).emit("message:new", {
+        acknowledgement?.({
+          success: true,
+          data: {
             message,
+            duplicate: result.duplicate,
+          },
+        });
+
+        if (result.duplicate) return;
+
+        // Stop typing when a message is sent.
+        clearTypingSession(
+          io,
+          socket,
+          String(conversationId)
+        );
+
+        io.to(room).emit("message:new", {
+          message,
+        });
+
+        const conversation =
+          await chatService.getConversationForUser({
+            conversationId,
+            userId: socket.user.id,
           });
 
-          const conversation =
-            await chatService.getConversationForUser({
-              conversationId,
-              userId: socket.user.id,
-            });
+        const recipient = conversation.participants.find(
+          (participant) => {
+            const participantId =
+              participant.user?._id || participant.user;
 
-          const recipient = conversation.participants.find(
-            (participant) => {
-              const participantId =
-                participant.user?._id || participant.user;
+            return String(participantId) !== userId;
+          }
+        );
 
-              return String(participantId) !== userId;
+        if (recipient) {
+          const recipientId =
+            recipient.user?._id || recipient.user;
+
+          io.to(getUserRoom(recipientId)).emit(
+            "conversation:updated",
+            {
+              conversationId: conversation._id,
+              message,
             }
           );
-
-          if (recipient) {
-            const recipientId =
-              recipient.user?._id || recipient.user;
-
-            io.to(getUserRoom(recipientId)).emit(
-              "conversation:updated",
-              {
-                conversationId: conversation._id,
-                message,
-              }
-            );
-          }
-        } catch (error) {
-          console.error("message:send error:", error);
-
-          emitChatError(socket, error);
-
-          acknowledgement?.({
-            success: false,
-            message: error.message,
-          });
         }
+      } catch (error) {
+        console.error("message:send error:", error);
+
+        emitChatError(socket, error);
+
+        acknowledgement?.({
+          success: false,
+          message: error.message,
+        });
       }
+    }
     );
 
     /*
@@ -414,26 +512,44 @@ const initializeSocket = (io) => {
      * ==========================================
      */
 
-    socket.on("disconnect", () => {
-      // Clear every typing session belonging to this socket.
-      for (const [key] of typingSessions) {
-        if (key.startsWith(`${socket.id}:`)) {
-          const conversationId = key.slice(
-            socket.id.length + 1
-          );
-
-          clearTypingSession(
-            io,
-            socket,
-            conversationId
-          );
-        }
-      }
-
-      console.log(
-        `🔌 Socket disconnected: ${socket.id} | user: ${userId}`
+   socket.on("disconnect", () => {
+  // 1. Clear every typing session belonging to this socket.
+  for (const [key] of typingSessions) {
+    if (key.startsWith(`${socket.id}:`)) {
+      const conversationId = key.slice(
+        socket.id.length + 1
       );
-    });
+
+      clearTypingSession(
+        io,
+        socket,
+        conversationId
+      );
+    }
+  }
+
+  // 2. Remove this socket from the user's online connections.
+  // This must happen independently of typing sessions.
+  const becameOffline = removeOnlineSocket(
+    userId,
+    socket.id
+  );
+
+  // 3. Broadcast offline only when the final device disconnects.
+  if (becameOffline) {
+    io.to(getPresenceRoom(userId)).emit(
+      "presence:update",
+      {
+        userId,
+        isOnline: false,
+      }
+    );
+  }
+
+  console.log(
+    `🔌 Socket disconnected: ${socket.id} | user: ${userId}`
+  );
+});
   });
 };
 

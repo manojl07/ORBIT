@@ -2,6 +2,8 @@
 import { MessageCircle, Search, RefreshCw } from "lucide-react";
 import { useMemo, useState } from "react";
 
+import usePresence from "../../hooks/usePresence";
+
 import ConversationItem from "./ConversationItem";
 
 const ConversationList = ({
@@ -13,6 +15,7 @@ const ConversationList = ({
   onSelect,
 }) => {
   const [search, setSearch] = useState("");
+  const { data: presenceByUser = {} } = usePresence();
 
   const filteredConversations = useMemo(() => {
     const normalizedSearch = search.trim().toLowerCase();
@@ -106,6 +109,15 @@ const ConversationList = ({
             <ConversationItem
               key={conversation._id}
               conversation={conversation}
+              presenceStatus={
+                presenceByUser[
+                  String(
+                    conversation.otherUser?._id ||
+                    conversation.otherUser?.id ||
+                    ""
+                  )
+                ]
+              }
               active={selectedConversationId === conversation._id}
               onClick={() => onSelect(conversation._id)}
             />
