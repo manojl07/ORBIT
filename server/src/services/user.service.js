@@ -19,47 +19,46 @@ const sanitizeUserProfile = (user, extras = {}) => ({
 /* =====================================================
    GET USER PROFILE
 ===================================================== */
-const getUserProfile = async ({profileUserId,currentUserId,}) => {
+const getUserProfile = async ({ profileUserId, currentUserId, }) => {
   const [user, postsCount, currentUser] = await Promise.all([
     User.findById(profileUserId),
     Post.countDocuments({ user: profileUserId }),
-    User.findById(currentUserId)
-      .select("following")
-      .lean(),
+    User.findById(currentUserId).select("following").lean(),
   ]);
+
+  const isOwnProfile = String(user._id) === String(currentUserId);
 
   if (!user) {
     throw new ApiError(404, "User not found");
   }
 
+  if (!currentUser) {
+    throw new ApiError(404, "Current user not found");
+  }
+
+  const currentUserFollowsProfile = currentUser.following.some((id) => String(id) === String(profileUserId));
+
+  const profileFollowsCurrentUser = user.following.some((id) => String(id) === String(currentUserId));
+
+  const canMessage = !isOwnProfile && currentUserFollowsProfile && profileFollowsCurrentUser;
+
+
   // IDs of everyone the current user follows.
-  const currentFollowingIds = new Set((currentUser?.following ?? []).map((id) => String(id))
-  );
+  const currentFollowingIds = new Set((currentUser?.following ?? []).map((id) => String(id)));
 
   // Find users who follow this profile AND are followed
   // by the currently logged-in user.
-  const mutualIds = [
-    ...new Set(
-      user.followers
-        .map((id) => String(id))
-        .filter((id) => currentFollowingIds.has(id))
-    ),
-  ];
+  const mutualIds = [...new Set(user.followers.map((id) => String(id)).filter((id) => currentFollowingIds.has(id))),];
 
   // Only retrieve a small number of user previews.
-  const mutualUsers = await User.find({
-    _id: { $in: mutualIds },
-  })
-    .select("username profileImg")
-    .limit(3)
-    .lean();
+  const mutualUsers = await User.find({ _id: { $in: mutualIds }, }).select("username profileImg").limit(3).lean();
 
   return sanitizeUserProfile(user, {
     postsCount,
-    isOwnProfile:String(user._id) === String(currentUserId),
-    isFollowing: user.followers.some((id) => String(id) === String(currentUserId)),
+    isOwnProfile,
+    isFollowing: currentUserFollowsProfile,
+    canMessage,
 
-    // New data required by ProfileHeader.jsx.
     mutualFriends: {
       count: mutualIds.length,
       users: mutualUsers.map((friend) => ({
@@ -68,7 +67,7 @@ const getUserProfile = async ({profileUserId,currentUserId,}) => {
         profileImg: friend.profileImg,
       })),
     },
-  });
+  })
 };
 
 /* =====================================================
@@ -87,15 +86,13 @@ const checkUsername = async ({ username, currentUserId, }) => {
 /* =====================================================
    FOLLOW / UNFOLLOW
 ===================================================== */
-const toggleFollow = async ({ profileUserId, currentUserId, }) => {
+
+const toggleFollow = async ({ profileUserId, currentUserId }) => {
   if (String(profileUserId) === String(currentUserId)) {
     throw new ApiError(400, "You cannot follow yourself.");
   }
 
-  const [currentUser, targetUser,] = await Promise.all([
-    User.findById(currentUserId),
-    User.findById(profileUserId),
-  ]);
+  const [currentUser, targetUser] = await Promise.all([User.findById(currentUserId), User.findById(profileUserId),]);
 
   if (!currentUser) {
     throw new ApiError(404, "Current user not found");
@@ -107,6 +104,12 @@ const toggleFollow = async ({ profileUserId, currentUserId, }) => {
 
   const alreadyFollowing = currentUser.following.some((id) => String(id) === String(profileUserId));
 
+  const targetFollowsCurrent = targetUser.following.some((id) => String(id) === String(currentUserId));
+
+  // Mutual-follow state before this operation.
+  const wasMutual = alreadyFollowing && targetFollowsCurrent;
+
+  // Perform follow / unfollow.
   if (alreadyFollowing) {
     currentUser.following.pull(profileUserId);
     targetUser.followers.pull(currentUserId);
@@ -117,12 +120,22 @@ const toggleFollow = async ({ profileUserId, currentUserId, }) => {
 
   await Promise.all([currentUser.save(), targetUser.save(),]);
 
+  const isNowFollowing = !alreadyFollowing;
+
+  // Mutual-follow state after this operation.
+  const isMutual = isNowFollowing && targetFollowsCurrent;
+
   return {
-    following: !alreadyFollowing,
+    following: isNowFollowing,
     followersCount: targetUser.followers.length,
     followingCount: currentUser.following.length,
+
+    // Messaging permission information.
+    canMessage: isMutual,
+    relationshipChanged: wasMutual !== isMutual,
   };
 };
+
 
 /* =====================================================
    SEARCH USERS
@@ -134,9 +147,7 @@ const searchUsers = async (query) => {
     return [];
   }
 
-  const users = await User.find({ username: { $regex: trimmedQuery, $options: "i", }, }).select("username profileImg")
-    .sort({ username: 1, })
-    .limit(10);
+  const users = await User.find({ username: { $regex: trimmedQuery, $options: "i", }, }).select("username profileImg").sort({ username: 1, }).limit(10);
 
   return users.map((user) => ({
     id: user._id,

@@ -1,10 +1,5 @@
 
-import {
-  createContext,
-  useContext,
-  useEffect,
-  useRef,
-} from "react";
+import { createContext, useContext, useEffect, useRef } from "react";
 
 import { useQueryClient } from "@tanstack/react-query";
 
@@ -95,38 +90,35 @@ const updateConversationPreview = (
   message,
   incrementUnread = false
 ) => {
-  queryClient.setQueryData(
-    queryKeys.conversations,
-    (old) => {
-      if (!Array.isArray(old)) return old;
+  queryClient.setQueryData(queryKeys.conversations, (old) => {
+    if (!Array.isArray(old)) return old;
 
-      const updated = old.map((conversation) => {
-        if (String(conversation._id) !== String(conversationId)) {
-          return conversation;
-        }
+    const updated = old.map((conversation) => {
+      if (String(conversation._id) !== String(conversationId)) {
+        return conversation;
+      }
 
-        return {
-          ...conversation,
-          lastMessage: {
-            messageId: message._id,
-            sender: getMessageSenderId(message),
-            text: message.text,
-            createdAt: message.createdAt,
-          },
-          lastMessageAt: message.createdAt,
-          unreadCount: incrementUnread
-            ? (conversation.unreadCount || 0) + 1
-            : conversation.unreadCount,
-        };
-      });
+      return {
+        ...conversation,
+        lastMessage: {
+          messageId: message._id,
+          sender: getMessageSenderId(message),
+          text: message.text,
+          createdAt: message.createdAt,
+        },
+        lastMessageAt: message.createdAt,
+        unreadCount: incrementUnread
+          ? (conversation.unreadCount || 0) + 1
+          : conversation.unreadCount,
+      };
+    });
 
-      return updated.sort(
-        (a, b) =>
-          new Date(b.lastMessageAt || b.updatedAt).getTime() -
-          new Date(a.lastMessageAt || a.updatedAt).getTime()
-      );
-    }
-  );
+    return updated.sort(
+      (a, b) =>
+        new Date(b.lastMessageAt || b.updatedAt).getTime() -
+        new Date(a.lastMessageAt || a.updatedAt).getTime()
+    );
+  });
 };
 
 const addMessageToCache = (
@@ -196,60 +188,64 @@ const updateParticipantReadMarker = (
   messageId,
   currentUserId
 ) => {
-  queryClient.setQueryData(
-    queryKeys.conversations,
-    (old) => {
-      if (!Array.isArray(old)) return old;
+  queryClient.setQueryData(queryKeys.conversations, (old) => {
+    if (!Array.isArray(old)) return old;
 
-      return old.map((conversation) => {
-        if (String(conversation._id) !== String(conversationId)) {
-          return conversation;
-        }
+    return old.map((conversation) => {
+      if (String(conversation._id) !== String(conversationId)) {
+        return conversation;
+      }
 
-        return {
-          ...conversation,
+      return {
+        ...conversation,
 
-          participants: (conversation.participants || []).map(
-            (participant) => {
-              const participantId =
-                participant.user?._id || participant.user;
+        participants: (conversation.participants || []).map(
+          (participant) => {
+            const participantId =
+              participant.user?._id || participant.user;
 
-              if (String(participantId) !== String(readerId)) {
-                return participant;
-              }
+            if (String(participantId) !== String(readerId)) {
+              return participant;
+            }
 
-              return {
-                ...participant,
-                lastReadMessage: messageId,
-                unreadCount: String(readerId) === currentUserId
+            return {
+              ...participant,
+              lastReadMessage: messageId,
+              unreadCount:
+                String(readerId) === currentUserId
                   ? 0
                   : participant.unreadCount,
-              };
-            }
-          ),
+            };
+          }
+        ),
 
-          // The conversation-level unreadCount belongs
-          // to the currently authenticated user.
-          unreadCount:
-            String(readerId) === currentUserId
-              ? 0
-              : conversation.unreadCount,
-        };
-      });
-    }
-  );
+        unreadCount:
+          String(readerId) === currentUserId
+            ? 0
+            : conversation.unreadCount,
+      };
+    });
+  });
 };
 
 export const SocketProvider = ({ children }) => {
   const { user, isAuthLoading } = useAuth();
+
   const queryClient = useQueryClient();
+
   const presenceWatchRef = useRef(null);
+
+  // Identifies the latest presence subscription generation.
+  // Prevents older acknowledgements from updating the cache.
+  const presenceWatchGenerationRef = useRef(0);
 
   useEffect(() => {
     if (isAuthLoading) return;
 
     if (!user) {
       presenceWatchRef.current = null;
+      presenceWatchGenerationRef.current += 1;
+
       queryClient.removeQueries({
         queryKey: queryKeys.presence,
         exact: true,
@@ -258,35 +254,53 @@ export const SocketProvider = ({ children }) => {
       if (socket.connected) {
         socket.disconnect();
       }
+
       return;
     }
 
     const currentUserId = getUserId(user);
+
+    /*
+     * ==========================================
+     * WATCH PRESENCE
+     * ==========================================
+     */
 
     const watchPresence = () => {
       const conversations = queryClient.getQueryData(
         queryKeys.conversations
       );
 
-      if (!socket.connected || !Array.isArray(conversations)) {
+      if (
+        !socket.connected ||
+        !Array.isArray(conversations)
+      ) {
         return;
       }
 
       const conversationIds = [
         ...new Set(
           conversations
-            .map((conversation) => String(conversation?._id || ""))
+            .map((conversation) =>
+              String(conversation?._id || "")
+            )
             .filter(Boolean)
         ),
       ].sort();
 
-      const requestKey = `${socket.id}:${conversationIds.join(",")}`;
+      const requestKey =
+        `${socket.id}:${conversationIds.join(",")}`;
 
       if (presenceWatchRef.current === requestKey) {
         return;
       }
 
       presenceWatchRef.current = requestKey;
+
+      // A new generation invalidates every previous request.
+      const generation =
+        ++presenceWatchGenerationRef.current;
+
       prunePresence(queryClient, conversations);
 
       for (
@@ -294,16 +308,23 @@ export const SocketProvider = ({ children }) => {
         start < conversationIds.length;
         start += MAX_PRESENCE_WATCH_IDS
       ) {
-        const conversationIdBatch = conversationIds.slice(
-          start,
-          start + MAX_PRESENCE_WATCH_IDS
-        );
+        const conversationIdBatch =
+          conversationIds.slice(
+            start,
+            start + MAX_PRESENCE_WATCH_IDS
+          );
 
         socket.timeout(10000).emit(
           "presence:watch",
-          { conversationIds: conversationIdBatch },
+          {
+            conversationIds: conversationIdBatch,
+          },
           (timeoutError, response) => {
-            if (presenceWatchRef.current !== requestKey) {
+            // Reject acknowledgements from older generations.
+            if (
+              presenceWatchGenerationRef.current !== generation ||
+              presenceWatchRef.current !== requestKey
+            ) {
               return;
             }
 
@@ -312,12 +333,14 @@ export const SocketProvider = ({ children }) => {
                 "Unable to load presence information:",
                 timeoutError || response?.message
               );
+
               return;
             }
 
-            const latestConversations = queryClient.getQueryData(
-              queryKeys.conversations
-            );
+            const latestConversations =
+              queryClient.getQueryData(
+                queryKeys.conversations
+              );
 
             if (!Array.isArray(latestConversations)) {
               return;
@@ -333,14 +356,24 @@ export const SocketProvider = ({ children }) => {
       }
     };
 
+    /*
+     * ==========================================
+     * CONNECTION EVENTS
+     * ==========================================
+     */
+
     const handleConnect = () => {
       console.log("🔌 ORBIT Socket connected:", socket.id);
+
       presenceWatchRef.current = null;
       watchPresence();
     };
 
     const handleReady = (payload) => {
-      console.log("✅ ORBIT Socket authenticated:", payload);
+      console.log(
+        "✅ ORBIT Socket authenticated:",
+        payload
+      );
     };
 
     const handleConnectError = (error) => {
@@ -351,13 +384,32 @@ export const SocketProvider = ({ children }) => {
     };
 
     const handleDisconnect = (reason) => {
-      console.log("🔌 ORBIT Socket disconnected:", reason);
+      console.log(
+        "🔌 ORBIT Socket disconnected:",
+        reason
+      );
+
       presenceWatchRef.current = null;
-      queryClient.setQueryData(queryKeys.presence, {});
+      presenceWatchGenerationRef.current += 1;
+
+      queryClient.setQueryData(
+        queryKeys.presence,
+        {}
+      );
     };
 
-    const handlePresenceUpdate = ({ userId, isOnline } = {}) => {
+    /*
+     * ==========================================
+     * PRESENCE UPDATE
+     * ==========================================
+     */
+
+    const handlePresenceUpdate = ({
+      userId,
+      isOnline,
+    } = {}) => {
       const normalizedUserId = String(userId || "");
+
       const conversations = queryClient.getQueryData(
         queryKeys.conversations
       );
@@ -365,21 +417,99 @@ export const SocketProvider = ({ children }) => {
       if (
         !normalizedUserId ||
         typeof isOnline !== "boolean" ||
-        !getPresenceUserIds(conversations).has(normalizedUserId)
+        !getPresenceUserIds(conversations).has(
+          normalizedUserId
+        )
       ) {
         return;
       }
 
-      queryClient.setQueryData(queryKeys.presence, (old) => ({
-        ...(old || {}),
-        [normalizedUserId]: isOnline,
-      }));
+      queryClient.setQueryData(
+        queryKeys.presence,
+        (old) => ({
+          ...(old || {}),
+          [normalizedUserId]: isOnline,
+        })
+      );
     };
+
+    /*
+     * ==========================================
+     * RELATIONSHIP UPDATE
+     * ==========================================
+     */
+
+
+    const handleRelationshipUpdated = ({ userId, canMessage, } = {}) => {
+      const normalizedUserId = String(userId || "");
+
+      if (!normalizedUserId || typeof canMessage !== "boolean") {
+        return;
+      }
+
+      // 1. Update the conversation permission immediately.
+      queryClient.setQueryData(queryKeys.conversations, (old) => {
+        if (!Array.isArray(old)) return old;
+
+        return old.map((conversation) => {
+          const otherUserId = getOtherUserId(conversation);
+
+          if (otherUserId !== normalizedUserId) {
+            return conversation;
+          }
+
+          return {
+            ...conversation,
+            canMessage,
+          };
+        });
+      }
+      );
+
+      // 2. Update the counterpart's profile cache.
+      queryClient.setQueryData(queryKeys.profile(normalizedUserId), (old) => {
+        if (!old) return old;
+
+        return {
+          ...old,
+          canMessage,
+        };
+      }
+      );
+
+      // 3. Invalidate previous presence subscription requests.
+      presenceWatchRef.current = null;
+      presenceWatchGenerationRef.current += 1;
+
+      if (!canMessage) {
+        // Remove stale presence information immediately.
+        queryClient.setQueryData(
+          queryKeys.presence,
+          (old) => {
+            const next = { ...(old || {}) };
+            delete next[normalizedUserId];
+            return next;
+          }
+        );
+      }
+
+      // 4. Recheck presence subscription with backend authorization.
+      watchPresence();
+    };
+
+
+    /*
+     * ==========================================
+     * NEW MESSAGE
+     * ==========================================
+     */
 
     const handleNewMessage = ({ message } = {}) => {
       if (!message) return;
 
-      const conversationId = String(message.conversation);
+      const conversationId = String(
+        message.conversation
+      );
 
       addMessageToCache(
         queryClient,
@@ -395,6 +525,12 @@ export const SocketProvider = ({ children }) => {
       );
     };
 
+    /*
+     * ==========================================
+     * CONVERSATION UPDATED
+     * ==========================================
+     */
+
     const handleConversationUpdated = ({
       conversationId,
       message,
@@ -404,16 +540,16 @@ export const SocketProvider = ({ children }) => {
       const isIncoming =
         getMessageSenderId(message) !== currentUserId;
 
-      const activeConversationId = queryClient.getQueryData([
-        "activeConversationId",
-      ]);
+      const activeConversationId =
+        queryClient.getQueryData([
+          "activeConversationId",
+        ]);
 
       const isCurrentlyViewing =
-        String(activeConversationId) === String(conversationId) &&
+        String(activeConversationId) ===
+        String(conversationId) &&
         document.visibilityState === "visible";
 
-      // Don't show unread count when the user is
-      // actively viewing this conversation.
       const shouldIncrementUnread =
         isIncoming && !isCurrentlyViewing;
 
@@ -432,40 +568,65 @@ export const SocketProvider = ({ children }) => {
     };
 
     /*
-     * A participant marked messages as read.
-     *
-     * Update that participant's marker for both users.
-     * Only clear the local unread count when the reader
-     * is the currently authenticated user.
+     * ==========================================
+     * CONVERSATION READ
+     * ==========================================
      */
+
     const handleConversationRead = ({
       conversationId,
       userId,
       messageId,
     } = {}) => {
+      if (!conversationId || !userId || !messageId) {
+        return;
+      }
 
-
-      if (!conversationId || !userId || !messageId) return;
-
-      updateParticipantReadMarker(queryClient, conversationId, userId, messageId, currentUserId);
+      updateParticipantReadMarker(
+        queryClient,
+        conversationId,
+        userId,
+        messageId,
+        currentUserId
+      );
     };
+
+    /*
+     * ==========================================
+     * REGISTER SOCKET EVENTS
+     * ==========================================
+     */
 
     socket.on("connect", handleConnect);
     socket.on("socket:ready", handleReady);
     socket.on("connect_error", handleConnectError);
     socket.on("disconnect", handleDisconnect);
-    socket.on("presence:update", handlePresenceUpdate);
+
+    socket.on("presence:update",handlePresenceUpdate);
+
+    socket.on("relationship:updated",handleRelationshipUpdated);
+
+    socket.off("relationship:updated", handleRelationshipUpdated);
 
     socket.on("message:new", handleNewMessage);
-    socket.on("conversation:updated", handleConversationUpdated);
-    socket.on("conversation:read", handleConversationRead);
+
+    socket.on("conversation:updated",handleConversationUpdated);
+
+    socket.on("conversation:read",handleConversationRead);
+
+    /*
+     * ==========================================
+     * WATCH CONVERSATION CACHE CHANGES
+     * ==========================================
+     */
 
     const unsubscribePresenceQuery =
       queryClient.getQueryCache().subscribe((event) => {
         const queryKey = event?.query?.queryKey;
 
         if (
-          queryKey?.length === queryKeys.conversations.length &&
+          queryKey?.length ===
+          queryKeys.conversations.length &&
           queryKey.every(
             (part, index) =>
               part === queryKeys.conversations[index]
@@ -475,11 +636,23 @@ export const SocketProvider = ({ children }) => {
         }
       });
 
+    /*
+     * ==========================================
+     * INITIAL CONNECTION
+     * ==========================================
+     */
+
     if (!socket.connected) {
       socket.connect();
     } else {
       watchPresence();
     }
+
+    /*
+     * ==========================================
+     * CLEANUP
+     * ==========================================
+     */
 
     return () => {
       unsubscribePresenceQuery();
@@ -488,11 +661,28 @@ export const SocketProvider = ({ children }) => {
       socket.off("socket:ready", handleReady);
       socket.off("connect_error", handleConnectError);
       socket.off("disconnect", handleDisconnect);
-      socket.off("presence:update", handlePresenceUpdate);
+
+      socket.off(
+        "presence:update",
+        handlePresenceUpdate
+      );
+
+      socket.off(
+        "relationship:updated",
+        handleRelationshipUpdated
+      );
 
       socket.off("message:new", handleNewMessage);
-      socket.off("conversation:updated", handleConversationUpdated);
-      socket.off("conversation:read", handleConversationRead);
+
+      socket.off(
+        "conversation:updated",
+        handleConversationUpdated
+      );
+
+      socket.off(
+        "conversation:read",
+        handleConversationRead
+      );
     };
   }, [user, isAuthLoading, queryClient]);
 
@@ -507,7 +697,9 @@ export const useSocket = () => {
   const socketInstance = useContext(SocketContext);
 
   if (!socketInstance) {
-    throw new Error("useSocket must be used inside SocketProvider");
+    throw new Error(
+      "useSocket must be used inside SocketProvider"
+    );
   }
 
   return socketInstance;

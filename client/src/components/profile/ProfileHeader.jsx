@@ -1,10 +1,6 @@
 
 import { Fragment, useState } from "react";
-import {
-  MoreHorizontal,
-  Pencil,
-  Settings,
-} from "lucide-react";
+import { MoreHorizontal, Pencil, Settings, } from "lucide-react";
 import { Link } from "react-router-dom";
 import { Bookmark } from "lucide-react";
 
@@ -13,23 +9,34 @@ import FollowingModal from "../social/FollowingModal";
 import FollowButton from "../social/FollowButton";
 import VerifiedBadge from "../ui/VerifiedBadge";
 
-const ProfileHeader = ({
-  user,
-  isOwnProfile,
-  onEditProfile,
-}) => {
+import { useNavigate } from "react-router-dom";
+import { getOrCreateDirectConversation } from "../../api/chat.api";
+import toast from "react-hot-toast";
+
+const ProfileHeader = ({ user, isOwnProfile, onEditProfile, }) => {
   const [followersOpen, setFollowersOpen] = useState(false);
   const [followingOpen, setFollowingOpen] = useState(false);
 
-  const handleNavigate = () => {
-    setFollowersOpen(false);
-    setFollowingOpen(false);
+  const navigate = useNavigate();
+  const [isCreatingConversation, setIsCreatingConversation] =
+    useState(false);
+
+  const handleMessage = async () => {
+    if (!user?.canMessage || isCreatingConversation) return;
+
+    try {
+      setIsCreatingConversation(true);
+      const conversation = await getOrCreateDirectConversation(user.id);
+      navigate(`/messages/${conversation._id}`);
+    } catch (error) {
+      console.error("Failed to open conversation:", error);
+      toast.error(error.response?.data?.message || "Unable to open conversation");
+    } finally {
+      setIsCreatingConversation(false);
+    }
   };
 
-  console.log("ProfileHeader verification:", {
-    username: user?.username,
-    isVerified: user?.isVerified,
-  });
+  const handleNavigate = () => { setFollowersOpen(false); setFollowingOpen(false); };
 
   const mutualFriends = user.mutualFriends;
   const mutualUsers = mutualFriends?.users ?? [];
@@ -124,6 +131,8 @@ const ProfileHeader = ({
                     isOwnProfile={isOwnProfile}
                     onEditProfile={onEditProfile}
                     user={user}
+                    onMessage={handleMessage}
+                    isCreatingConversation={isCreatingConversation}
                   />
                 </div>
               </div>
@@ -164,12 +173,16 @@ const ProfileHeader = ({
                     <FollowButton user={user} />
                   </div>
 
-                  <button
-                    type="button"
-                    className="flex h-10 items-center justify-center rounded-lg bg-zinc-800 text-sm font-semibold text-white transition hover:bg-zinc-700"
-                  >
-                    Message
-                  </button>
+                  {user.canMessage && (
+                    <button
+                      type="button"
+                      onClick={handleMessage}
+                      disabled={isCreatingConversation}
+                      className="flex h-10 items-center justify-center rounded-lg bg-zinc-800 text-sm font-semibold text-white transition hover:bg-zinc-700 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      {isCreatingConversation ? "Opening..." : "Message"}
+                    </button>
+                  )}
                 </>
               )}
             </div>
@@ -288,6 +301,8 @@ const ProfileActions = ({
   isOwnProfile,
   onEditProfile,
   user,
+  onMessage,
+  isCreatingConversation,
 }) => {
   if (isOwnProfile) {
     return (
@@ -324,12 +339,16 @@ const ProfileActions = ({
     <>
       <FollowButton user={user} />
 
-      <button
-        type="button"
-        className="rounded-lg bg-zinc-800 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-zinc-700"
-      >
-        Message
-      </button>
+      {user.canMessage && (
+        <button
+          type="button"
+          onClick={onMessage}
+          disabled={isCreatingConversation}
+          className="rounded-lg bg-zinc-800 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-zinc-700 disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          {isCreatingConversation ? "Opening..." : "Message"}
+        </button>
+      )}
     </>
   );
 };

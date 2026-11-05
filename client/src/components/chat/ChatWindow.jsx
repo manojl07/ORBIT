@@ -1,18 +1,6 @@
-import {
-  useEffect,
-  useMemo,
-  useRef,
-  useLayoutEffect,
-  useCallback,
-  useState,
-} from "react";
+import { useEffect, useMemo, useRef, useLayoutEffect, useCallback, useState, } from "react";
 
-import {
-  ArrowLeft,
-  MoreHorizontal,
-  Phone,
-  Video,
-} from "lucide-react";
+import { ArrowLeft, MoreHorizontal, Phone, Video, } from "lucide-react";
 
 import { useQueryClient } from "@tanstack/react-query";
 
@@ -33,6 +21,8 @@ const NEAR_BOTTOM_THRESHOLD = 120;
 const ChatWindow = ({ conversation, onBack }) => {
   const otherUser = conversation.otherUser;
 
+  const canMessage = conversation.canMessage === true;
+
   const socket = useSocket();
   const queryClient = useQueryClient();
 
@@ -51,21 +41,12 @@ const ChatWindow = ({ conversation, onBack }) => {
   const typingTimeoutRef = useRef(null);
 
   const handleTypingStart = useCallback(() => {
-    console.log("[TYPING] Emitting typing:start", conversation._id);
+    if (!canMessage || !socket.connected) return;
 
-    if (!socket.connected) {
-      console.log("[TYPING] Socket disconnected");
-      return;
-    }
-
-    socket.emit(
-      "typing:start",
-      { conversationId: conversation._id },
-      (response) => {
-        console.log("[TYPING] Start acknowledgement:", response);
-      }
-    );
-  }, [socket, conversation._id]);
+    socket.emit("typing:start", { conversationId: conversation._id }, (response) => {
+      console.log("[TYPING] Start acknowledgement:", response);
+    });
+  }, [socket, conversation._id, canMessage]);
 
   const handleTypingStop = useCallback(() => {
     console.log("[TYPING] Emitting typing:stop", conversation._id);
@@ -80,6 +61,12 @@ const ChatWindow = ({ conversation, onBack }) => {
       }
     );
   }, [socket, conversation._id]);
+
+  useEffect(() => {
+    if (!canMessage) {
+      setTypingUser(null);
+    }
+  }, [canMessage]);
 
   useEffect(() => {
     const conversationId = String(conversation._id);
@@ -439,6 +426,8 @@ const ChatWindow = ({ conversation, onBack }) => {
    */
 
   const handleSendMessage = (text) => {
+    if (!canMessage) return;
+
     const clientMessageId = crypto.randomUUID();
 
     sendMessage.mutate({
@@ -455,6 +444,8 @@ const ChatWindow = ({ conversation, onBack }) => {
    */
 
   const handleRetryMessage = (message) => {
+    if (!canMessage) return;
+
     sendMessage.mutate({
       conversationId: conversation._id,
       clientMessageId: message.clientMessageId,
@@ -616,22 +607,14 @@ const ChatWindow = ({ conversation, onBack }) => {
 
       {/* MESSAGE COMPOSER */}
       <div className="shrink-0 border-t border-zinc-800 p-3 sm:p-4">
-        <MessageComposer
-          onSend={handleSendMessage}
-          onTypingStart={handleTypingStart}
-          onTypingStop={handleTypingStop}
-          isSending={sendMessage.isPending}
-          disabled={
-            isLoading ||
-            isError ||
-            !socket.connected
-          }
-        />
+        <MessageComposer onSend={handleSendMessage} onTypingStart={handleTypingStart} onTypingStop={handleTypingStop} isSending={sendMessage.isPending} disabled={isLoading || isError || !socket.connected || !canMessage} />
+
+        {!canMessage && (
+          <p className="mt-2 text-center text-xs text-amber-500">You can only send messages to users who follow you back.</p>
+        )}
 
         {!socket.connected && (
-          <p className="mt-2 text-center text-xs text-amber-500">
-            Reconnecting to chat...
-          </p>
+          <p className="mt-2 text-center text-xs text-amber-500">Reconnecting to chat...</p>
         )}
       </div>
     </div>

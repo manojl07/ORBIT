@@ -43,11 +43,7 @@ const getReferencedUserId = (user) => {
 
 // Generate a deterministic key for direct conversations.
 const getDirectKey = (userA, userB) => {
-  const ids = [
-    userA.toString(),
-    userB.toString(),
-  ].sort();
-
+  const ids = [userA.toString(), userB.toString(),].sort();
   return `${ids[0]}:${ids[1]}`;
 };
 
@@ -59,11 +55,7 @@ const isParticipant = (conversation, userId) => {
 
   const normalizedUserId = userId.toString();
 
-  return conversation.participants.some(
-    (participant) =>
-      getReferencedUserId(participant.user) ===
-      normalizedUserId
-  );
+  return conversation.participants.some((participant) => getReferencedUserId(participant.user) === normalizedUserId);
 };
 
 // Retrieve a particular participant.
@@ -73,59 +65,44 @@ const getParticipant = (conversation, userId) => {
   }
 
   const normalizedUserId = userId.toString();
+  return conversation.participants.find((participant) => getReferencedUserId(participant.user) === normalizedUserId);
+};
 
-  return conversation.participants.find(
-    (participant) =>
-      getReferencedUserId(participant.user) ===
-      normalizedUserId
-  );
+const assertMutualFollow = async ({ currentUserId, targetUserId, }) => {
+  const [currentFollowsTarget, targetFollowsCurrent] = await Promise.all([User.exists({ _id: currentUserId, following: targetUserId, }), User.exists({ _id: targetUserId, following: currentUserId, }),]);
+
+  if (!currentFollowsTarget || !targetFollowsCurrent) {
+    throw new ApiError(403, "You can only message users who follow you back");
+  }
 };
 
 /* =====================================================
    CREATE / GET DIRECT CONVERSATION
 ===================================================== */
 
-const getOrCreateDirectConversation = async ({
-  currentUserId,
-  targetUserId,
-}) => {
+const getOrCreateDirectConversation = async ({ currentUserId, targetUserId, }) => {
   const currentUser = normalizeUserId(currentUserId);
   const targetUser = normalizeUserId(targetUserId);
 
-  if (
-    currentUser.toString() ===
-    targetUser.toString()
-  ) {
-    throw new ApiError(
-      400,
-      "You cannot message yourself"
-    );
+  if (currentUser.toString() === targetUser.toString()) {
+    throw new ApiError(400, "You cannot message yourself");
   }
 
   // Confirm that the target user exists.
-  const targetExists = await User.exists({
-    _id: targetUser,
-  });
+  const targetExists = await User.exists({ _id: targetUser, });
 
   if (!targetExists) {
     throw new ApiError(404, "User not found");
   }
 
   // Generate the canonical pair key.
-  const directKey = getDirectKey(
-    currentUser,
-    targetUser
-  );
+  const directKey = getDirectKey(currentUser, targetUser);
 
   // Check whether this conversation already exists.
-  let conversation = await Conversation.findOne({
-    directKey,
-  })
-    .populate(
-      "participants.user",
-      "_id username profileImg isVerified"
-    )
-    .lean();
+  let conversation = await Conversation.findOne({ directKey, }).populate("participants.user", "_id username profileImg isVerified").lean();
+
+  // Enforce mutual-follow authorization.
+  await assertMutualFollow({ currentUserId: currentUser, targetUserId: targetUser, });
 
   if (conversation) {
     return conversation;
@@ -135,7 +112,6 @@ const getOrCreateDirectConversation = async ({
     conversation = await Conversation.create({
       type: "direct",
       directKey,
-
       participants: [
         {
           user: currentUser,
@@ -157,9 +133,7 @@ const getOrCreateDirectConversation = async ({
     }
 
     // Retrieve the conversation created by the other request.
-    conversation = await Conversation.findOne({
-      directKey,
-    });
+    conversation = await Conversation.findOne({ directKey, });
 
     if (!conversation) {
       throw error;
@@ -167,101 +141,78 @@ const getOrCreateDirectConversation = async ({
   }
 
   // Return the conversation with populated participants.
-  return Conversation.findById(conversation._id)
-    .populate(
-      "participants.user",
-      "_id username profileImg isVerified"
-    )
-    .lean();
+  return Conversation.findById(conversation._id).populate("participants.user", "_id username profileImg isVerified").lean();
 };
 
 /* =====================================================
    GET USER CONVERSATIONS
 ===================================================== */
 
+
 const getUserConversations = async ({ userId }) => {
   const normalizedUserId = normalizeUserId(userId);
 
-  const conversations = await Conversation.find({
-    "participants.user": normalizedUserId,
-  })
-    .sort({
-      lastMessageAt: -1,
-      updatedAt: -1,
-    })
-    .populate(
-      "participants.user",
-      "_id username profileImg isVerified"
-    )
-    .lean();
+  const conversations = await Conversation.find({ "participants.user": normalizedUserId, }).sort({ lastMessageAt: -1, updatedAt: -1 }).populate("participants.user", "_id username profileImg isVerified").lean();
+
+  // Collect the other participant IDs.
+  const otherUserIds = conversations.map((conversation) => {
+    const otherParticipant = conversation.participants.find((participant) => getReferencedUserId(participant.user) !== normalizedUserId.toString());
+    return getReferencedUserId(otherParticipant?.user);
+  }).filter(Boolean);
+
+  // Fetch mutual-follow permissions for all conversations.
+  const [currentUser, otherUsers] = await Promise.all([
+    User.findById(normalizedUserId).select("following").lean(),
+    User.find({ _id: { $in: otherUserIds }, }).select("_id following").lean(),
+  ]);
+
+  const currentFollowing = new Set((currentUser?.following ?? []).map(String));
+
+  const otherUsersMap = new Map(otherUsers.map((user) => [user._id.toString(), new Set((user.following ?? []).map(String)),]));
 
   return conversations.map((conversation) => {
-    // Find the logged-in user's participant information.
-    const currentParticipant =
-      getParticipant(conversation, normalizedUserId);
+    const currentParticipant = getParticipant(conversation, normalizedUserId);
 
-    // Find the other participant.
-    const otherParticipant =
-      conversation.participants.find(
-        (participant) =>
-          getReferencedUserId(participant.user) !==
-          normalizedUserId.toString()
-      );
+    const otherParticipant = conversation.participants.find((participant) => getReferencedUserId(participant.user) !== normalizedUserId.toString());
+
+    const otherUser = otherParticipant?.user || null;
+    const otherUserId = getReferencedUserId(otherUser);
+
+    const otherFollowing = otherUsersMap.get(otherUserId);
+
+    const canMessage = currentFollowing.has(otherUserId) && otherFollowing?.has(normalizedUserId.toString()) === true;
 
     return {
       ...conversation,
-
-      // Convenience fields for frontend.
-      otherUser: otherParticipant?.user || null,
-
-      unreadCount:
-        currentParticipant?.unreadCount || 0,
+      otherUser,
+      unreadCount: currentParticipant?.unreadCount || 0,
+      canMessage,
     };
   });
 };
+
 
 /* =====================================================
    GET CONVERSATION
 ===================================================== */
 
-const getConversationForUser = async ({
-  conversationId,
-  userId,
-}) => {
-  if (
-    !mongoose.Types.ObjectId.isValid(conversationId)
-  ) {
-    throw new ApiError(
-      400,
-      "Invalid conversation ID"
-    );
+const getConversationForUser = async ({ conversationId, userId, }) => {
+  if (!mongoose.Types.ObjectId.isValid(conversationId)) {
+    throw new ApiError(400, "Invalid conversation ID");
   }
 
   // Populate participants so their user information
   // is available to the frontend and other services.
-  const conversation = await Conversation.findById(
-    conversationId
-  )
-    .populate(
-      "participants.user",
-      "_id username profileImg isVerified"
-    )
-    .lean();
+  const conversation = await Conversation.findById(conversationId).populate("participants.user", "_id username profileImg isVerified").lean();
 
   if (!conversation) {
-    throw new ApiError(
-      404,
-      "Conversation not found"
-    );
+    throw new ApiError(404, "Conversation not found");
   }
 
   // Verify that the authenticated user belongs
   // to this conversation.
   if (!isParticipant(conversation, userId)) {
-    throw new ApiError(
-      403,
-      "You are not a participant in this conversation"
-    );
+    throw new ApiError(403, "You are not a participant in this conversation");
   }
 
   return conversation;
@@ -271,32 +222,19 @@ const getConversationForUser = async ({
    GET MESSAGE HISTORY
 ===================================================== */
 
-const getMessages = async ({
-  conversationId,
-  userId,
-  cursor = null,
-  limit = 30,
-}) => {
+const getMessages = async ({ conversationId, userId, cursor = null, limit = 30, }) => {
   // Verify conversation access first.
-  const conversation = await getConversationForUser({
-    conversationId,
-    userId,
-  });
+  const conversation = await getConversationForUser({ conversationId, userId, });
 
   let safeLimit = Number(limit);
 
-  if (
-    !Number.isInteger(safeLimit) ||
-    safeLimit < 1
-  ) {
+  if (!Number.isInteger(safeLimit) || safeLimit < 1) {
     safeLimit = 30;
   }
 
   safeLimit = Math.min(safeLimit, 50);
 
-  const query = {
-    conversation: conversation._id,
-  };
+  const query = { conversation: conversation._id, };
 
   /*
    * Cursor format:
@@ -311,53 +249,28 @@ const getMessages = async ({
     let decodedCursor;
 
     try {
-      decodedCursor = JSON.parse(
-        Buffer.from(cursor, "base64url").toString("utf8")
-      );
+      decodedCursor = JSON.parse(Buffer.from(cursor, "base64url").toString("utf8"));
     } catch {
-      throw new ApiError(
-        400,
-        "Invalid message cursor"
-      );
+      throw new ApiError(400, "Invalid message cursor");
     }
 
-    if (
-      !decodedCursor?.createdAt ||
-      !mongoose.Types.ObjectId.isValid(
-        decodedCursor.id
-      )
-    ) {
-      throw new ApiError(
-        400,
-        "Invalid message cursor"
-      );
+    if (!decodedCursor?.createdAt || !mongoose.Types.ObjectId.isValid(decodedCursor.id)) {
+      throw new ApiError(400, "Invalid message cursor");
     }
 
-    const cursorDate = new Date(
-      decodedCursor.createdAt
-    );
+    const cursorDate = new Date(decodedCursor.createdAt);
 
     if (Number.isNaN(cursorDate.getTime())) {
-      throw new ApiError(
-        400,
-        "Invalid message cursor"
-      );
+      throw new ApiError(400, "Invalid message cursor");
     }
 
     query.$or = [
       {
-        createdAt: {
-          $lt: cursorDate,
-        },
+        createdAt: { $lt: cursorDate, },
       },
       {
         createdAt: cursorDate,
-
-        _id: {
-          $lt: new mongoose.Types.ObjectId(
-            decodedCursor.id
-          ),
-        },
+        _id: { $lt: new mongoose.Types.ObjectId(decodedCursor.id), },
       },
     ];
   }
@@ -367,17 +280,7 @@ const getMessages = async ({
    * whether another page exists.
    */
 
-  const messages = await Message.find(query)
-    .sort({
-      createdAt: -1,
-      _id: -1,
-    })
-    .limit(safeLimit + 1)
-    .populate(
-      "sender",
-      "_id username profileImg isVerified"
-    )
-    .lean();
+  const messages = await Message.find(query).sort({ createdAt: -1, _id: -1, }).limit(safeLimit + 1).populate("sender", "_id username profileImg isVerified").lean();
 
   const hasMore = messages.length > safeLimit;
 
@@ -387,17 +290,10 @@ const getMessages = async ({
 
   // Generate the next cursor from the oldest
   // message in the current page.
-  const nextCursor =
-    hasMore && messages.length > 0
-      ? Buffer.from(
-        JSON.stringify({
-          createdAt:
-            messages[messages.length - 1].createdAt,
-
-          id: messages[messages.length - 1]._id,
-        })
-      ).toString("base64url")
-      : null;
+  const nextCursor = hasMore && messages.length > 0 ? Buffer.from(JSON.stringify({
+    createdAt: messages[messages.length - 1].createdAt,
+    id: messages[messages.length - 1]._id,
+  })).toString("base64url") : null;
 
   /*
    * History is returned oldest → newest
@@ -408,11 +304,7 @@ const getMessages = async ({
 
   return {
     messages,
-
-    pagination: {
-      hasMore,
-      nextCursor,
-    },
+    pagination: { hasMore, nextCursor, },
   };
 };
 
@@ -420,84 +312,60 @@ const getMessages = async ({
    SEND MESSAGE
 ===================================================== */
 
-const sendMessage = async ({
-  conversationId,
-  senderId,
-  clientMessageId,
-  text,
-}) => {
-  if (
-    !mongoose.Types.ObjectId.isValid(conversationId)
-  ) {
-    throw new ApiError(
-      400,
-      "Invalid conversation ID"
-    );
+const sendMessage = async ({ conversationId, senderId, clientMessageId, text, }) => {
+  if (!mongoose.Types.ObjectId.isValid(conversationId)) {
+    throw new ApiError(400, "Invalid conversation ID");
   }
 
   const normalizedSenderId = normalizeUserId(senderId);
 
-  if (
-    typeof clientMessageId !== "string" ||
-    !clientMessageId.trim() ||
-    clientMessageId.trim().length > 100
-  ) {
-    throw new ApiError(
-      400,
-      "Invalid client message ID"
-    );
+  if (typeof clientMessageId !== "string" || !clientMessageId.trim() || clientMessageId.trim().length > 100) {
+    throw new ApiError(400, "Invalid client message ID");
   }
 
   if (typeof text !== "string") {
-    throw new ApiError(
-      400,
-      "Message text is required"
-    );
+    throw new ApiError(400, "Message text is required");
   }
 
   const normalizedText = text.trim();
 
   if (!normalizedText) {
-    throw new ApiError(
-      400,
-      "Message cannot be empty"
-    );
+    throw new ApiError(400, "Message cannot be empty");
   }
 
-  if (
-    normalizedText.length > MAX_MESSAGE_LENGTH
-  ) {
-    throw new ApiError(
-      400,
-      `Message cannot exceed ${MAX_MESSAGE_LENGTH} characters`
-    );
+  if (normalizedText.length > MAX_MESSAGE_LENGTH) {
+    throw new ApiError(400, `Message cannot exceed ${MAX_MESSAGE_LENGTH} characters`);
   }
 
   // Retrieve conversation without populate.
   // Here participant.user is an ObjectId.
-  const conversation = await Conversation.findById(
-    conversationId
-  );
+  const conversation = await Conversation.findById(conversationId);
 
   if (!conversation) {
-    throw new ApiError(
-      404,
-      "Conversation not found"
-    );
+    throw new ApiError(404, "Conversation not found");
   }
 
   // Verify sender authorization.
   // This helper now works with populated and
   // unpopulated references.
+  // Verify sender authorization.
   if (!isParticipant(conversation, normalizedSenderId)) {
-    throw new ApiError(
-      403,
-      "You are not a participant in this conversation"
-    );
+    throw new ApiError(403, "You are not a participant in this conversation");
   }
 
-  const normalizedClientMessageId =
-    clientMessageId.trim();
+  // Find the other participant.
+  const recipient = conversation.participants.find((participant) => getReferencedUserId(participant.user) !== normalizedSenderId.toString());
+
+  if (!recipient) {
+    throw new ApiError(500, "Conversation recipient not found");
+  }
+
+  const recipientUserId = getReferencedUserId(recipient.user);
+
+  // Enforce mutual-follow authorization.
+  await assertMutualFollow({ currentUserId: normalizedSenderId, targetUserId: recipientUserId, });
+
+  const normalizedClientMessageId = clientMessageId.trim();
 
   /*
    * IDEMPOTENCY CHECK
@@ -507,16 +375,7 @@ const sendMessage = async ({
    * another message.
    */
 
-  const existingMessage = await Message.findOne({
-    conversation: conversation._id,
-    sender: normalizedSenderId,
-    clientMessageId: normalizedClientMessageId,
-  })
-    .populate(
-      "sender",
-      "_id username profileImg isVerified"
-    )
-    .lean();
+  const existingMessage = await Message.findOne({ conversation: conversation._id, sender: normalizedSenderId, clientMessageId: normalizedClientMessageId, }).populate("sender", "_id username profileImg isVerified").lean();
 
   if (existingMessage) {
     return {
@@ -537,8 +396,7 @@ const sendMessage = async ({
           {
             conversation: conversation._id,
             sender: normalizedSenderId,
-            clientMessageId:
-              normalizedClientMessageId,
+            clientMessageId: normalizedClientMessageId,
             type: "text",
             text: normalizedText,
           },
@@ -549,24 +407,13 @@ const sendMessage = async ({
       createdMessage = message;
 
       // 2. Find the recipient.
-      const recipient =
-        conversation.participants.find(
-          (participant) =>
-            getReferencedUserId(participant.user) !==
-            normalizedSenderId.toString()
-        );
+      const recipient = conversation.participants.find((participant) => getReferencedUserId(participant.user) !== normalizedSenderId.toString());
 
       if (!recipient) {
-        throw new ApiError(
-          500,
-          "Conversation recipient not found"
-        );
+        throw new ApiError(500, "Conversation recipient not found");
       }
 
-      const recipientUserId =
-        new mongoose.Types.ObjectId(
-          getReferencedUserId(recipient.user)
-        );
+      const recipientUserId = new mongoose.Types.ObjectId(getReferencedUserId(recipient.user));
 
       /*
        * 3. Update recipient unread count
@@ -585,17 +432,14 @@ const sendMessage = async ({
               text: normalizedText,
               createdAt: message.createdAt,
             },
-
             lastMessageAt: message.createdAt,
           },
-
           $inc: {
             "participants.$[recipient].unreadCount": 1,
           },
         },
         {
           session,
-
           arrayFilters: [
             {
               "recipient.user": recipientUserId,
@@ -611,14 +455,7 @@ const sendMessage = async ({
      * Now fetch the populated message.
      */
 
-    const populatedMessage = await Message.findById(
-      createdMessage._id
-    )
-      .populate(
-        "sender",
-        "_id username profileImg isVerified"
-      )
-      .lean();
+    const populatedMessage = await Message.findById(createdMessage._id).populate("sender", "_id username profileImg isVerified").lean();
 
     return {
       message: populatedMessage,
@@ -637,12 +474,7 @@ const sendMessage = async ({
         conversation: conversation._id,
         sender: normalizedSenderId,
         clientMessageId: normalizedClientMessageId,
-      })
-        .populate(
-          "sender",
-          "_id username profileImg isVerified"
-        )
-        .lean();
+      }).populate("sender", "_id username profileImg isVerified").lean();
 
       if (duplicateMessage) {
         return {
@@ -666,8 +498,6 @@ const sendMessage = async ({
 
 const markConversationAsRead = async ({ conversationId, userId, messageId, }) => {
 
-  
-
   const normalizedUserId = normalizeUserId(userId);
 
   if (!mongoose.Types.ObjectId.isValid(conversationId)) {
@@ -685,50 +515,34 @@ const markConversationAsRead = async ({ conversationId, userId, messageId, }) =>
   try {
     await session.withTransaction(async () => {
       // 1. Load the conversation and verify membership.
-      const conversation = await Conversation.findById(
-        conversationId
-      ).session(session);
+      const conversation = await Conversation.findById(conversationId).session(session);
 
       if (!conversation) {
         throw new ApiError(404, "Conversation not found");
       }
 
       if (!isParticipant(conversation, normalizedUserId)) {
-        throw new ApiError(
-          403,
-          "You are not a participant in this conversation"
-        );
+        throw new ApiError(403, "You are not a participant in this conversation");
       }
 
       // 2. Verify that the requested read marker belongs
       //    to this conversation.
-      const requestedMessage = await Message.findOne({
-        _id: messageId,
-        conversation: conversation._id,
-      }).session(session);
+      const requestedMessage = await Message.findOne({ _id: messageId, conversation: conversation._id, }).session(session);
 
       if (!requestedMessage) {
         throw new ApiError(404, "Message not found");
       }
 
-      const participant = getParticipant(
-        conversation,
-        normalizedUserId
-      );
+      const participant = getParticipant(conversation, normalizedUserId);
 
       // 3. Never move the read marker backwards.
       let effectiveReadMessage = requestedMessage;
 
       if (participant.lastReadMessage) {
-        const previousReadMessage = await Message.findOne({
-          _id: participant.lastReadMessage,
-          conversation: conversation._id,
-        }).session(session);
+        const previousReadMessage = await Message.findOne({ _id: participant.lastReadMessage, conversation: conversation._id, }).session(session);
 
         if (previousReadMessage) {
-          const previousIsNewer =
-            previousReadMessage.createdAt >
-            requestedMessage.createdAt ||
+          const previousIsNewer = previousReadMessage.createdAt > requestedMessage.createdAt ||
             (
               previousReadMessage.createdAt.getTime() ===
               requestedMessage.createdAt.getTime() &&
@@ -745,19 +559,14 @@ const markConversationAsRead = async ({ conversationId, userId, messageId, }) =>
       // 4. Count incoming messages newer than the effective
       //    read marker. Messages sent by this user do not count.
       const unreadCount = await Message.countDocuments({
-        conversation: conversation._id,
-        sender: { $ne: normalizedUserId },
+        conversation: conversation._id, sender: { $ne: normalizedUserId },
         $or: [
           {
-            createdAt: {
-              $gt: effectiveReadMessage.createdAt,
-            },
+            createdAt: { $gt: effectiveReadMessage.createdAt, },
           },
           {
             createdAt: effectiveReadMessage.createdAt,
-            _id: {
-              $gt: effectiveReadMessage._id,
-            },
+            _id: { $gt: effectiveReadMessage._id, },
           },
         ],
       }).session(session);
@@ -770,8 +579,7 @@ const markConversationAsRead = async ({ conversationId, userId, messageId, }) =>
         },
         {
           $set: {
-            "participants.$.lastReadMessage":
-              effectiveReadMessage._id,
+            "participants.$.lastReadMessage": effectiveReadMessage._id,
             "participants.$.unreadCount": unreadCount,
           },
         },
@@ -784,13 +592,20 @@ const markConversationAsRead = async ({ conversationId, userId, messageId, }) =>
         unreadCount,
       };
     });
-    console.log("📖 MARK READ SUCCESS");
 
     return result;
   } finally {
     await session.endSession();
   }
+};
 
+const areMutualFollowers = async ({ userAId, userBId }) => {
+  const [aFollowsB, bFollowsA] = await Promise.all([
+    User.exists({ _id: userAId, following: userBId, }),
+    User.exists({ _id: userBId, following: userAId, }),
+  ]);
+
+  return Boolean(aFollowsB && bFollowsA);
 };
 
 
@@ -798,18 +613,4 @@ const markConversationAsRead = async ({ conversationId, userId, messageId, }) =>
    EXPORTS
 ===================================================== */
 
-module.exports = {
-  getDirectKey,
-  getReferencedUserId,
-  isParticipant,
-  getParticipant,
-
-  getOrCreateDirectConversation,
-  getUserConversations,
-  getConversationForUser,
-
-  getMessages,
-  sendMessage,
-
-  markConversationAsRead,
-};
+module.exports = { getDirectKey, getReferencedUserId, isParticipant, getParticipant, getOrCreateDirectConversation, getUserConversations, getConversationForUser, getMessages, sendMessage, markConversationAsRead, areMutualFollowers, };

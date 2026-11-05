@@ -3,6 +3,8 @@ const ApiResponse = require("../utils/ApiResponse");
 
 const userService = require("../services/user.service");
 
+const { revokeRelationshipAccess, } = require("../socket/socket");
+
 /* =====================================================
    GET USER PROFILE
 ===================================================== */
@@ -35,15 +37,34 @@ const checkUsernameController = asyncHandler(async (req, res) => {
    FOLLOW / UNFOLLOW
 ===================================================== */
 
+
 const toggleFollowController = asyncHandler(async (req, res) => {
-  const result = await userService.toggleFollow({
-    profileUserId: req.params.userId,
-    currentUserId: req.user.id,
-  });
+  const currentUserId = String(req.user.id);
+  const profileUserId = String(req.params.userId);
+
+  const result = await userService.toggleFollow({ profileUserId, currentUserId, });
+
+  // Notify both users only when mutual-follow permission changes.
+  if (result.relationshipChanged) {
+    const io = req.app.get("io");
+
+    if (io) {
+      // Notify both users.
+      io.to(`user:${currentUserId}`).emit("relationship:updated", { userId: profileUserId, canMessage: result.canMessage, });
+
+      io.to(`user:${profileUserId}`).emit("relationship:updated", { userId: currentUserId, canMessage: result.canMessage, });
+
+      // Immediately revoke existing socket access when
+      // mutual-follow permission is removed.
+      if (!result.canMessage) {
+        await revokeRelationshipAccess(io, { userAId: currentUserId, userBId: profileUserId, });
+      }
+    }
+  }
 
   return res.status(200).json(new ApiResponse(200, result.following ? "User followed" : "User unfollowed", result));
-}
-);
+});
+
 
 /* =====================================================
    SEARCH USERS
@@ -51,7 +72,6 @@ const toggleFollowController = asyncHandler(async (req, res) => {
 
 const searchUsersController = asyncHandler(async (req, res) => {
   const users = await userService.searchUsers(req.query.q);
-
   return res.status(200).json(new ApiResponse(200, "User fetched successfully", users));
 }
 );

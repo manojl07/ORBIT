@@ -2,6 +2,8 @@
 const chatService = require("../services/chat.service");
 const socketAuth = require("./socketAuth");
 
+const ApiError = require("../utils/ApiError");
+
 const USER_ROOM_PREFIX = "user:";
 const CONVERSATION_ROOM_PREFIX = "conversation:";
 const PRESENCE_ROOM_PREFIX = "presence:";
@@ -58,6 +60,8 @@ const getConversationRoom = (conversationId) => {
 
 const emitChatError = (socket, error) => {
   socket.emit("chat:error", {
+    statusCode: error?.statusCode || 500,
+    code: error?.code || null,
     message: error?.message || "Chat operation failed",
   });
 };
@@ -65,15 +69,9 @@ const emitChatError = (socket, error) => {
 // Track typing independently for every socket and conversation.
 const typingSessions = new Map();
 
-const getTypingKey = (socketId, conversationId) =>
-  `${socketId}:${conversationId}`;
+const getTypingKey = (socketId, conversationId) => `${socketId}:${conversationId}`;
 
-const clearTypingSession = (
-  io,
-  socket,
-  conversationId,
-  notify = true
-) => {
+const clearTypingSession = (io, socket, conversationId, notify = true) => {
   const key = getTypingKey(socket.id, conversationId);
   const session = typingSessions.get(key);
 
@@ -85,12 +83,43 @@ const clearTypingSession = (
   if (notify) {
     console.log("⌨️ BROADCASTING TYPING STOP TO:", session.recipientId);
 
-    io.to(getUserRoom(session.recipientId)).emit(
-      "typing:update",
+    io.to(getUserRoom(session.recipientId)).emit("typing:update",
       {
         conversationId,
         userId: socket.user.id,
         username: socket.user.username,
+        isTyping: false,
+      }
+    );
+  }
+};
+
+const revokeRelationshipAccess = async (io, { userAId, userBId }) => {
+  const normalizedUserAId = String(userAId);
+  const normalizedUserBId = String(userBId);
+
+  // Remove every connected device from the other user's
+  // presence room.
+  await Promise.all([io.in(getUserRoom(normalizedUserAId)).socketsLeave(getPresenceRoom(normalizedUserBId)),
+
+  io.in(getUserRoom(normalizedUserBId)).socketsLeave(getPresenceRoom(normalizedUserAId)),]);
+
+  // Clear active typing sessions in both directions.
+  for (const [key, session] of typingSessions) {
+    const isRelationshipSession = (session.senderId === normalizedUserAId && session.recipientId === normalizedUserBId) || (session.senderId === normalizedUserBId && session.recipientId === normalizedUserAId);
+
+    if (!isRelationshipSession) {
+      continue;
+    }
+
+    clearTimeout(session.timeout);
+    typingSessions.delete(key);
+
+    // Notify the recipient that typing has stopped.
+    io.to(getUserRoom(session.recipientId)).emit("typing:update",
+      {
+        conversationId: session.conversationId,
+        userId: session.senderId,
         isTyping: false,
       }
     );
@@ -102,17 +131,13 @@ const initializeSocket = (io) => {
 
   io.on("connection", (socket) => {
     const userId = socket.user.id;
-
     socket.join(getUserRoom(userId));
-
     const becameOnline = addOnlineSocket(userId, socket.id);
 
     if (becameOnline) {
       io.to(getPresenceRoom(userId)).emit("presence:update", { userId, isOnline: true, });
     }
-
     console.log(`🔌 Socket connected: ${socket.id} | user: ${userId}`);
-
     socket.emit("socket:ready", { socketId: socket.id, userId, });
 
     /*
@@ -124,34 +149,19 @@ const initializeSocket = (io) => {
     socket.on("conversation:join", async (payload, acknowledgement) => {
       try {
         const conversationId = payload?.conversationId;
-
-        const conversation =
-          await chatService.getConversationForUser({
-            conversationId,
-            userId,
-          });
-
+        const conversation = await chatService.getConversationForUser({ conversationId, userId, });
         const room = getConversationRoom(conversation._id);
-
         socket.join(room);
-
-        const response = {
-          conversationId: conversation._id.toString(),
-        };
-
+        const response = { conversationId: conversation._id.toString(), };
         socket.emit("conversation:joined", response);
-
-        acknowledgement?.({
-          success: true,
-          data: response,
-        });
+        acknowledgement?.({ success: true, data: response, });
       } catch (error) {
         console.error("conversation:join error:", error);
-
         emitChatError(socket, error);
-
         acknowledgement?.({
           success: false,
+          statusCode: error.statusCode || 500,
+          code: error.code || null,
           message: error.message,
         });
       }
@@ -163,59 +173,78 @@ const initializeSocket = (io) => {
       try {
         const conversationIds = payload?.conversationIds;
 
-        if (
-          !Array.isArray(conversationIds) ||
-          conversationIds.length > 100
-        ) {
+        if (!Array.isArray(conversationIds) || conversationIds.length > 100) {
           throw new Error("Invalid conversation IDs");
         }
 
         const presence = [];
 
         for (const conversationId of new Set(conversationIds)) {
-          const conversation =
-            await chatService.getConversationForUser({
-              conversationId,
-              userId,
-            });
+          const conversation = await chatService.getConversationForUser({ conversationId, userId, });
 
-          const otherParticipant =
-            conversation.participants.find((participant) => {
-              const participantId =
-                participant.user?._id || participant.user;
-
-              return String(participantId) !== userId;
-            });
+          const otherParticipant = conversation.participants.find((participant) => {
+            const participantId = participant.user?._id || participant.user;
+            return String(participantId) !== userId;
+          });
 
           if (!otherParticipant) {
             continue;
           }
 
-          const otherUserId = String(
-            otherParticipant.user?._id ||
-            otherParticipant.user
-          );
+          const otherUserId = String(otherParticipant.user?._id || otherParticipant.user);
 
           // Subscribe this socket to the other participant's
           // presence updates.
+          // Presence is available only between mutual followers.
+
+          const canMessage = await chatService.areMutualFollowers({userAId: userId,userBId: otherUserId,});
+
+          if (!canMessage) {
+            socket.leave(getPresenceRoom(otherUserId));
+
+            presence.push({
+              conversationId: conversation._id.toString(),
+              userId: otherUserId,
+              isOnline: false,
+            });
+
+            continue;
+          }
+
+          // Subscribe to future presence updates.
           socket.join(getPresenceRoom(otherUserId));
 
+          // Recheck permission after joining.
+          const stillCanMessage = await chatService.areMutualFollowers({userAId: userId,userBId: otherUserId,});
+
+          if (!stillCanMessage) {
+            socket.leave(getPresenceRoom(otherUserId));
+
+            presence.push({
+              conversationId: conversation._id.toString(),
+              userId: otherUserId,
+              isOnline: false,
+            });
+
+            continue;
+          }
+
+          // IMPORTANT: Return the initial presence snapshot.
           presence.push({
             conversationId: conversation._id.toString(),
             userId: otherUserId,
             isOnline: isUserOnline(otherUserId),
           });
+
         }
 
-        acknowledgement?.({
-          success: true,
-          data: presence,
-        });
+        acknowledgement?.({ success: true, data: presence, });
       } catch (error) {
         console.error("presence:watch error:", error);
-
         acknowledgement?.({
           success: false,
+          statusCode: error.statusCode || 500,
+          code: error.code || null,
           message: error.message,
         });
       }
@@ -232,34 +261,22 @@ const initializeSocket = (io) => {
       try {
         const conversationId = payload?.conversationId;
 
-        const conversation =
-          await chatService.getConversationForUser({
-            conversationId,
-            userId,
-          });
+        const conversation = await chatService.getConversationForUser({ conversationId, userId, });
 
-        const normalizedConversationId =
-          conversation._id.toString();
-
+        const normalizedConversationId = conversation._id.toString();
         // Clear typing before leaving.
-        clearTypingSession(
-          io,
-          socket,
-          normalizedConversationId
-        );
+        clearTypingSession(io, socket, normalizedConversationId);
 
-        socket.leave(
-          getConversationRoom(normalizedConversationId)
-        );
+        socket.leave(getConversationRoom(normalizedConversationId));
 
-        acknowledgement?.({
-          success: true,
-        });
+        acknowledgement?.({ success: true, });
       } catch (error) {
         console.error("conversation:leave error:", error);
 
         acknowledgement?.({
           success: false,
+          statusCode: error.statusCode || 500,
+          code: error.code || null,
           message: error.message,
         });
       }
@@ -278,54 +295,45 @@ const initializeSocket = (io) => {
         const conversationId = payload?.conversationId;
 
         // DEBUG: Confirm the frontend event reached the backend.
-        console.log("⌨️ TYPING START RECEIVED:", {
-          socketId: socket.id,
-          userId,
-          conversationId,
-        });
+        console.log("⌨️ TYPING START RECEIVED:", { socketId: socket.id, userId, conversationId, });
 
-        const conversation =
-          await chatService.getConversationForUser({
-            conversationId,
-            userId,
-          });
+        const conversation = await chatService.getConversationForUser({ conversationId, userId, });
 
-        const normalizedConversationId =
-          conversation._id.toString();
-
+        const normalizedConversationId = conversation._id.toString();
         // Only allow typing from a joined conversation.
-        const room = getConversationRoom(
-          normalizedConversationId
-        );
+        const room = getConversationRoom(normalizedConversationId);
 
         if (!socket.rooms.has(room)) {
-          throw new Error(
-            "Join the conversation before sending typing events"
-          );
+          throw new Error("Join the conversation before sending typing events");
         }
 
         // Find the other participant.
-        const recipient = conversation.participants.find(
-          (participant) => {
-            const participantId =
-              participant.user?._id || participant.user;
-
-            return String(participantId) !== userId;
-          }
+        const recipient = conversation.participants.find((participant) => {
+          const participantId = participant.user?._id || participant.user;
+          return String(participantId) !== userId;
+        }
         );
 
         if (!recipient) {
           throw new Error("Conversation recipient not found");
         }
 
-        const recipientId = String(
-          recipient.user?._id || recipient.user
-        );
+        const recipientId = String(recipient.user?._id || recipient.user);
 
-        const key = getTypingKey(
-          socket.id,
-          normalizedConversationId
-        );
+        // Typing is permitted only between mutual followers.
+        const canMessage = await chatService.areMutualFollowers({ userAId: userId, userBId: recipientId, });
+
+        if (!canMessage) {
+          throw new ApiError(403, "You can no longer send typing events to this user");
+        }
+
+        const stillCanMessage = await chatService.areMutualFollowers({ userAId: userId, userBId: recipientId, });
+
+        if (!stillCanMessage) {
+          throw new ApiError(403, "You can no longer send typing events to this user");
+        }
+
+        const key = getTypingKey(socket.id, normalizedConversationId);
 
         const existingSession = typingSessions.get(key);
 
@@ -336,15 +344,13 @@ const initializeSocket = (io) => {
         }
 
         const timeout = setTimeout(() => {
-          clearTypingSession(
-            io,
-            socket,
-            normalizedConversationId
-          );
+          clearTypingSession(io, socket, normalizedConversationId);
         }, TYPING_TIMEOUT_MS);
 
         typingSessions.set(key, {
+          senderId: userId,
           recipientId,
+          conversationId: normalizedConversationId,
           timeout,
         });
 
@@ -353,18 +359,9 @@ const initializeSocket = (io) => {
           const recipientRoom = getUserRoom(recipientId);
 
           // DEBUG: Inspect recipient's connected sockets.
-          console.log("⌨️ RECIPIENT ROOM DEBUG:", {
-            recipientRoom,
-            recipientId,
-            connectedSockets: [
-              ...(io.sockets.adapter.rooms.get(recipientRoom) || []),
-            ],
-          });
+          console.log("⌨️ RECIPIENT ROOM DEBUG:", { recipientRoom, recipientId, connectedSockets: [...(io.sockets.adapter.rooms.get(recipientRoom) || []),], });
 
-          console.log(
-            "⌨️ BROADCASTING TYPING TO:",
-            recipientId
-          );
+          console.log("⌨️ BROADCASTING TYPING TO:", recipientId);
 
           io.to(recipientRoom).emit("typing:update", {
             conversationId: normalizedConversationId,
@@ -374,9 +371,7 @@ const initializeSocket = (io) => {
           });
         }
 
-        acknowledgement?.({
-          success: true,
-        });
+        acknowledgement?.({ success: true, });
       } catch (error) {
         console.error("❌ typing:start error:", error);
 
@@ -384,6 +379,8 @@ const initializeSocket = (io) => {
 
         acknowledgement?.({
           success: false,
+          statusCode: error.statusCode || 500,
+          code: error.code || null,
           message: error.message,
         });
       }
@@ -415,7 +412,12 @@ const initializeSocket = (io) => {
 
         emitChatError(socket, error);
 
-        acknowledgement?.({ success: false, message: error.message, });
+        acknowledgement?.({
+          success: false,
+          statusCode: error.statusCode || 500,
+          code: error.code || null,
+          message: error.message,
+        });
       }
     }
     );
@@ -428,18 +430,9 @@ const initializeSocket = (io) => {
 
     socket.on("message:send", async (payload, acknowledgement) => {
       try {
-        const {
-          conversationId,
-          clientMessageId,
-          text,
-        } = payload || {};
+        const { conversationId, clientMessageId, text, } = payload || {};
 
-        const result = await chatService.sendMessage({
-          conversationId,
-          senderId: socket.user.id,
-          clientMessageId,
-          text,
-        });
+        const result = await chatService.sendMessage({ conversationId, senderId: socket.user.id, clientMessageId, text, });
 
         const message = result.message;
 
@@ -456,34 +449,21 @@ const initializeSocket = (io) => {
         if (result.duplicate) return;
 
         // Stop typing when a message is sent.
-        clearTypingSession(
-          io,
-          socket,
-          String(conversationId)
-        );
+        clearTypingSession(io, socket, String(conversationId));
 
-        io.to(room).emit("message:new", {
-          message,
-        });
+        io.to(room).emit("message:new", { message, });
 
-        const conversation =
-          await chatService.getConversationForUser({
-            conversationId,
-            userId: socket.user.id,
-          });
+        const conversation = await chatService.getConversationForUser({ conversationId, userId: socket.user.id, });
 
         const recipient = conversation.participants.find(
           (participant) => {
-            const participantId =
-              participant.user?._id || participant.user;
-
+            const participantId = participant.user?._id || participant.user;
             return String(participantId) !== userId;
           }
         );
 
         if (recipient) {
-          const recipientId =
-            recipient.user?._id || recipient.user;
+          const recipientId = recipient.user?._id || recipient.user;
 
           io.to(getUserRoom(recipientId)).emit(
             "conversation:updated",
@@ -500,6 +480,8 @@ const initializeSocket = (io) => {
 
         acknowledgement?.({
           success: false,
+          statusCode: error.statusCode || 500,
+          code: error.code || null,
           message: error.message,
         });
       }
@@ -512,49 +494,28 @@ const initializeSocket = (io) => {
      * ==========================================
      */
 
-   socket.on("disconnect", () => {
-  // 1. Clear every typing session belonging to this socket.
-  for (const [key] of typingSessions) {
-    if (key.startsWith(`${socket.id}:`)) {
-      const conversationId = key.slice(
-        socket.id.length + 1
-      );
+    socket.on("disconnect", () => {
+      // 1. Clear every typing session belonging to this socket.
+      for (const [key] of typingSessions) {
+        if (key.startsWith(`${socket.id}:`)) {
+          const conversationId = key.slice(socket.id.length + 1);
 
-      clearTypingSession(
-        io,
-        socket,
-        conversationId
-      );
-    }
-  }
-
-  // 2. Remove this socket from the user's online connections.
-  // This must happen independently of typing sessions.
-  const becameOffline = removeOnlineSocket(
-    userId,
-    socket.id
-  );
-
-  // 3. Broadcast offline only when the final device disconnects.
-  if (becameOffline) {
-    io.to(getPresenceRoom(userId)).emit(
-      "presence:update",
-      {
-        userId,
-        isOnline: false,
+          clearTypingSession(io, socket, conversationId);
+        }
       }
-    );
-  }
 
-  console.log(
-    `🔌 Socket disconnected: ${socket.id} | user: ${userId}`
-  );
-});
+      // 2. Remove this socket from the user's online connections.
+      // This must happen independently of typing sessions.
+      const becameOffline = removeOnlineSocket(userId, socket.id);
+
+      // 3. Broadcast offline only when the final device disconnects.
+      if (becameOffline) {
+        io.to(getPresenceRoom(userId)).emit("presence:update", { userId, isOnline: false, });
+      }
+
+      console.log(`🔌 Socket disconnected: ${socket.id} | user: ${userId}`);
+    });
   });
 };
 
-module.exports = {
-  initializeSocket,
-  getUserRoom,
-  getConversationRoom,
-};
+module.exports = { initializeSocket, getUserRoom, getConversationRoom, revokeRelationshipAccess, };

@@ -7,82 +7,42 @@ const chatService = require("../services/chat.service");
    CREATE / GET DIRECT CONVERSATION
 ===================================================== */
 
-const getOrCreateDirectConversationController =
-  asyncHandler(async (req, res) => {
-    const conversation =
-      await chatService.getOrCreateDirectConversation(
+const getOrCreateDirectConversationController =asyncHandler(async (req, res) => {
+    const conversation =await chatService.getOrCreateDirectConversation(
         {
-          currentUserId:
-            req.user.id,
+          currentUserId:req.user.id,
 
-          targetUserId:
-            req.params.userId,
+          targetUserId:req.params.userId,
         }
       );
 
-    return res.status(200).json(
-      new ApiResponse(
-        200,
-        "Conversation ready",
-        conversation
-      )
-    );
+    return res.status(200).json(new ApiResponse(200,"Conversation ready",conversation));
   });
 
 /* =====================================================
    GET CONVERSATIONS
 ===================================================== */
 
-const getConversationsController =
-  asyncHandler(async (req, res) => {
-    const conversations =
-      await chatService.getUserConversations({
-        userId: req.user.id,
-      });
+const getConversationsController =asyncHandler(async (req, res) => {
+    const conversations =await chatService.getUserConversations({userId: req.user.id,});
 
-    return res.status(200).json(
-      new ApiResponse(
-        200,
-        "Conversations fetched successfully",
-        conversations
-      )
-    );
+    return res.status(200).json(new ApiResponse(200,"Conversations fetched successfully",conversations));
   });
 
 /* =====================================================
    GET MESSAGES
 ===================================================== */
 
-const getMessagesController =
-  asyncHandler(async (req, res) => {
-    const result =
-      await chatService.getMessages({
-        conversationId:
-          req.params.conversationId,
-
-        userId:
-          req.user.id,
-
-        cursor:
-          req.query.cursor || null,
-
-        limit:
-          req.query.limit || 30,
+const getMessagesController =asyncHandler(async (req, res) => {
+    const result =await chatService.getMessages({
+        conversationId:req.params.conversationId,
+        userId:req.user.id,
+        cursor:req.query.cursor || null,
+        limit:req.query.limit || 30,
       });
 
-    return res.status(200).json(
-      new ApiResponse(
-        200,
-        "Messages fetched successfully",
-        result
-      )
-    );
+    return res.status(200).json(new ApiResponse(200,"Messages fetched successfully",result));
   });
-
-/* =====================================================
-   MARK READ
-===================================================== */
-
 
 /* =====================================================
    MARK READ
@@ -146,9 +106,7 @@ const markConversationAsReadController = asyncHandler(async (req, res) => {
   });
 
 
-module.exports = {
-  getOrCreateDirectConversationController,
-  getConversationsController,
-  getMessagesController,
-  markConversationAsReadController,
-};
+module.exports = {getOrCreateDirectConversationController,getConversationsController,getMessagesController,markConversationAsReadController,};
+
+
+
